@@ -32,6 +32,13 @@ expected = {
 assert expected.issubset(set(server._tool_manager._tools))
 PY
 
+mkdir -p "$TMP_ROOT/hook-repo"
+git -C "$TMP_ROOT/hook-repo" init >/dev/null
+AGENT_JOURNAL_HOME="$TMP_ROOT/hook-journal" \
+  "$VENV/bin/agent-journal" install git-hook --repo "$TMP_ROOT/hook-repo" >"$TMP_ROOT/install-git-hook.out"
+test -x "$TMP_ROOT/hook-repo/.git/hooks/post-commit"
+grep -q "agent-journal event --type git_commit" "$TMP_ROOT/hook-repo/.git/hooks/post-commit"
+
 mkdir -p "$TMP_ROOT/real"
 cat > "$TMP_ROOT/real/codex" <<'SH'
 #!/usr/bin/env sh

@@ -33,16 +33,16 @@ journal_event --type agent_end --agent "$AGENT" --session-id "$SESSION_ID" --com
 exit "$STATUS"
 """
 
+GIT_HOOK_BODY = """#!/usr/bin/env sh
+agent-journal event --type git_commit --agent "${AGENT_JOURNAL_AGENT:-git}" >/dev/null 2>&1 || true
+"""
+
 
 def project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def wrapper_source() -> Path:
-    return project_root() / "scripts" / "wrappers" / "agent-journal-wrapper.sh"
-
-
-def generate_wrapper_script(agent: str, real_bin: str, wrapper: str | None = None) -> str:
+def generate_wrapper_script(agent: str, real_bin: str) -> str:
     return WRAPPER_BODY.format(agent=agent, real_bin=real_bin)
 
 
@@ -52,9 +52,10 @@ def install_wrappers(root: str | Path, real_bins: dict[str, str] | None = None) 
     bin_dir.mkdir(parents=True, exist_ok=True)
     resolved = real_bins or {}
     if not resolved:
+        bin_dir_resolved = bin_dir.resolve()
         for agent in ("codex", "claude", "gemini"):
             found = shutil.which(agent)
-            if found and not str(found).startswith(str(bin_dir)):
+            if found and not Path(found).resolve().is_relative_to(bin_dir_resolved):
                 resolved[agent] = found
 
     installed: dict[str, Path] = {}
@@ -75,8 +76,7 @@ def install_git_hook(repo: str | Path) -> Path:
         backup = hooks_dir / "post-commit.agent-journal.bak"
         if not backup.exists():
             backup.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
-    source = project_root() / "scripts" / "hooks" / "post-commit"
-    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    target.write_text(GIT_HOOK_BODY, encoding="utf-8")
     target.chmod(0o755)
     return target
 

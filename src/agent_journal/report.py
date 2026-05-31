@@ -5,7 +5,7 @@ from typing import Any
 
 def _label(event: dict[str, Any]) -> str:
     semantic = event.get("semantic") or {}
-    task_id = semantic.get("task_id")
+    task_id = _task_id(event)
     note = semantic.get("note") or semantic.get("reason")
     commit = event.get("commit")
     repo = event.get("repo") or event.get("cwd") or "unknown repo"

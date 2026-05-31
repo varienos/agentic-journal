@@ -63,6 +63,16 @@ def test_install_git_hook_backs_up_existing_hook(tmp_path):
     assert (hooks / "post-commit.agent-journal.bak").read_text() == "existing\n"
 
 
+def test_install_git_hook_does_not_depend_on_source_tree(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    monkeypatch.setattr("agent_journal.install.project_root", lambda: tmp_path / "missing-source")
+
+    installed = install_git_hook(repo)
+
+    assert installed == repo / ".git" / "hooks" / "post-commit"
+    assert "agent-journal event --type git_commit" in installed.read_text()
+
+
 def test_codex_mcp_snippet_mentions_agent_journal_mcp():
     snippet = codex_mcp_snippet("/repo")
 

@@ -37,6 +37,8 @@ Correlation rules:
   evidence. A `task_completed_claim` can become `completed_verified` when a
   passed `verification` event has the same `semantic.task_id` and a compatible
   `repo`.
+- New writers should put task ids in `semantic.task_id`. Readers also accept a
+  top-level `task_id` as a legacy fallback for older or external event writers.
 - Repos are compatible when both events have the same `repo`, or when one side
   was produced by a legacy/MCP writer that did not include repo metadata.
 - If no matching passed verification exists, task completion remains

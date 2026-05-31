@@ -98,6 +98,29 @@ def test_completion_claim_with_matching_task_verification_is_verified():
     assert items["completed_claimed"] == []
 
 
+def test_completion_claim_with_legacy_top_level_task_id_verification_is_verified():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "task_completed_claim",
+                "agent": "gemini",
+                "repo": "/repo",
+                "task_id": "TASK-11",
+                "semantic": {"note": "Legacy writer"},
+            },
+            {
+                "event_type": "verification",
+                "agent": "codex",
+                "repo": "/repo",
+                "task_id": "TASK-11",
+                "evidence": {"verification_status": "passed", "verification": "pytest"},
+            },
+        ]
+    )
+
+    assert items["completed_verified"] == ["TASK-11 - Legacy writer - agent=gemini - repo=/repo"]
+
+
 def test_completion_claim_with_mismatched_repo_task_verification_stays_claimed():
     items = classify_daily_work(
         [
