@@ -1,3 +1,0 @@
-#!/usr/bin/env sh
-agent-journal event --type git_commit --agent "${AGENT_JOURNAL_AGENT:-git}" >/dev/null 2>&1 || true
-

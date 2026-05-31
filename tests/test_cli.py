@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from agent_journal.cli import main
+from agent_journal.install import generate_wrapper_script
 
 
 def test_main_help_exits_cleanly(capsys):
@@ -85,15 +86,24 @@ def test_status_command_prints_today_summary(tmp_path, monkeypatch, capsys):
 
 
 def test_wrapper_preserves_exit_code_and_logs_events(tmp_path):
-    wrapper = Path("scripts/wrappers/agent-journal-wrapper.sh").resolve()
     fake_bin = tmp_path / "fake-agent"
     fake_bin.write_text("#!/usr/bin/env sh\nexit 7\n")
     fake_bin.chmod(0o755)
+    wrapper = tmp_path / "codex"
+    wrapper.write_text(generate_wrapper_script("codex", str(fake_bin)), encoding="utf-8")
+    wrapper.chmod(0o755)
+    shim_dir = tmp_path / "bin"
+    shim_dir.mkdir()
+    agent_journal = shim_dir / "agent-journal"
+    agent_journal.write_text(
+        f'#!/usr/bin/env sh\nPYTHONPATH="{Path("src").resolve()}" "{sys.executable}" -m agent_journal.cli "$@"\n',
+        encoding="utf-8",
+    )
+    agent_journal.chmod(0o755)
 
     env = os.environ.copy()
     env["AGENT_JOURNAL_HOME"] = str(tmp_path / "journal")
-    env["AGENT_JOURNAL_AGENT"] = "codex"
-    env["AGENT_JOURNAL_REAL_BIN"] = str(fake_bin)
+    env["PATH"] = f"{shim_dir}:{env['PATH']}"
 
     result = subprocess.run([str(wrapper)], env=env, check=False)
 

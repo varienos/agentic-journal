@@ -110,10 +110,9 @@ Install into the current repo:
 agent-journal install git-hook --repo .
 ```
 
-For a single repo, copy `scripts/hooks/post-commit` to `.git/hooks/post-commit`
-and make it executable. The hook records commit metadata without blocking commits.
-If an existing hook is present, the installer writes a
-`post-commit.agent-journal.bak` backup before replacing it.
+The hook records commit metadata without blocking commits. If an existing hook
+is present, the installer writes a `post-commit.agent-journal.bak` backup before
+replacing it.
 
 ## MCP Setup
 
