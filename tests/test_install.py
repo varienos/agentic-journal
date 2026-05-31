@@ -1,3 +1,6 @@
+import os
+import subprocess
+
 from agent_journal.install import (
     codex_mcp_snippet,
     generate_wrapper_script,
@@ -13,6 +16,24 @@ def test_generate_wrapper_script_points_to_real_binary():
     assert "AGENT_JOURNAL_REAL_BIN=\"/usr/local/bin/codex\"" in script
     assert "scripts/wrappers" not in script
     assert "agent-journal event" in script
+
+
+def test_generated_wrapper_warns_when_agent_journal_is_missing(tmp_path):
+    real_bin = tmp_path / "real" / "codex"
+    real_bin.parent.mkdir()
+    real_bin.write_text("#!/usr/bin/env sh\nexit 7\n")
+    real_bin.chmod(0o755)
+    wrapper = tmp_path / "codex"
+    wrapper.write_text(generate_wrapper_script("codex", str(real_bin)), encoding="utf-8")
+    wrapper.chmod(0o755)
+    env = os.environ.copy()
+    env["AGENT_JOURNAL_HOME"] = str(tmp_path / "journal")
+    env["PATH"] = "/usr/bin:/bin"
+
+    result = subprocess.run([str(wrapper)], env=env, capture_output=True, text=True, check=False)
+
+    assert result.returncode == 7
+    assert "agent-journal command not found" in result.stderr
 
 
 def test_install_wrappers_creates_agent_bins(tmp_path):

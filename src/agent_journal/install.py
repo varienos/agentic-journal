@@ -13,9 +13,15 @@ export AGENT_JOURNAL_REAL_BIN
 AGENT="$AGENT_JOURNAL_AGENT"
 SESSION_ID="$(date +%s)-$$"
 START_TS="$(date +%s)"
+AGENT_JOURNAL_WARNED=0
 
 journal_event() {{
-  agent-journal event "$@" >/dev/null 2>&1 || true
+  if command -v agent-journal >/dev/null 2>&1; then
+    agent-journal event "$@" >/dev/null 2>&1 || true
+  elif [ "$AGENT_JOURNAL_WARNED" -eq 0 ]; then
+    echo "agent-journal command not found; skipping journal event. Add the package bin directory to PATH." >&2
+    AGENT_JOURNAL_WARNED=1
+  fi
 }}
 
 journal_event --type agent_start --agent "$AGENT" --session-id "$SESSION_ID" --command "$AGENT"

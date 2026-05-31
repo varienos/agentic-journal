@@ -51,6 +51,76 @@ def test_completion_claim_without_commit_is_claimed():
     assert items["completed_claimed"]
 
 
+def test_completion_claim_with_matching_session_verification_is_verified():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "task_completed_claim",
+                "agent": "codex",
+                "session_id": "session-1",
+                "repo": "/repo",
+                "semantic": {"task_id": "TASK-9", "note": "Done"},
+            },
+            {
+                "event_type": "verification",
+                "agent": "codex",
+                "session_id": "session-1",
+                "repo": "/repo",
+                "evidence": {"verification_status": "passed", "verification": "pytest"},
+            },
+        ]
+    )
+
+    assert items["completed_verified"] == ["TASK-9 - Done - agent=codex - repo=/repo"]
+    assert items["completed_claimed"] == []
+
+
+def test_completion_claim_with_matching_task_verification_is_verified():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "task_completed_claim",
+                "agent": "claude",
+                "repo": "/repo",
+                "semantic": {"task_id": "TASK-10", "note": "Implemented"},
+            },
+            {
+                "event_type": "verification",
+                "agent": "codex",
+                "repo": "/repo",
+                "semantic": {"task_id": "TASK-10"},
+                "evidence": {"verification_status": "passed", "verification": "scripts/verify.sh"},
+            },
+        ]
+    )
+
+    assert items["completed_verified"] == ["TASK-10 - Implemented - agent=claude - repo=/repo"]
+    assert items["completed_claimed"] == []
+
+
+def test_completion_claim_with_mismatched_repo_task_verification_stays_claimed():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "task_completed_claim",
+                "agent": "claude",
+                "repo": "/repo-a",
+                "semantic": {"task_id": "TASK-10", "note": "Implemented"},
+            },
+            {
+                "event_type": "verification",
+                "agent": "codex",
+                "repo": "/repo-b",
+                "semantic": {"task_id": "TASK-10"},
+                "evidence": {"verification_status": "passed", "verification": "scripts/verify.sh"},
+            },
+        ]
+    )
+
+    assert items["completed_verified"] == []
+    assert items["completed_claimed"] == ["TASK-10 - Implemented - agent=claude - repo=/repo-a"]
+
+
 def test_failed_agent_end_is_risky():
     items = classify_daily_work(
         [{"event_type": "agent_end", "agent": "claude", "exit_code": 1, "repo": "/repo"}]

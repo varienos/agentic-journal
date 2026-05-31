@@ -1,5 +1,93 @@
 # Agent Journal Operations
 
+## Backlog Workflow
+
+This repository tracks stabilization and follow-up work with Backlog.md. The
+Backlog setup files are part of the repo state and should be committed:
+
+- `.backlog/config.yml`
+- `.backlog/tasks/*.md`
+- `AGENTS.md`
+- `CLAUDE.md`
+- `GEMINI.md`
+
+Use the Backlog MCP workflow when the client exposes it. If MCP resources or
+tools are not available, use the CLI fallback:
+
+```bash
+backlog task list --plain
+backlog search "agent journal wrapper" --plain
+backlog search "evidence correlation" --plain
+backlog task create "Concrete outcome title" --plain
+backlog task edit TASK-1 --status "Done" --plain
+```
+
+Before opening a new task, run duplicate searches with at least:
+
+- the feature or fix area, for example `wrapper`, `packaging`, `evidence`
+- the user-visible symptom, for example `missing commit files`
+- the affected command or module, for example `agent-journal-mcp`
+
+When reporting task changes, include the task id, title, status, and the most
+important files inspected or changed. Keep implementation work out of task
+planning turns unless the user explicitly asks to execute the tasks.
+
+## Stabilization Verification
+
+Run the full stabilization smoke before closing backlog tasks or preparing a
+release candidate:
+
+```bash
+scripts/verify.sh
+scripts/package-smoke.sh
+```
+
+`scripts/verify.sh` runs the Python test suite, compiles `src`, writes a daily
+report, checks wrapper event capture, verifies git commit metadata, and confirms
+the MCP server exposes the expected journal tools.
+
+`scripts/package-smoke.sh` builds a wheel, installs it into a temporary venv,
+checks packaged console scripts, verifies generated wrappers, and confirms the
+MCP server can be created from the packaged environment.
+
+## Local And Global Install
+
+Run from the source checkout without installing:
+
+```bash
+uv run agent-journal --help
+uv run agent-journal report --today
+uv run agent-journal-mcp
+```
+
+Use editable install while developing the package:
+
+```bash
+uv pip install -e .
+agent-journal --help
+agent-journal install wrappers
+```
+
+Install globally with `uv tool` when the package is ready to use outside the
+repo:
+
+```bash
+uv tool install .
+agent-journal --help
+agent-journal install wrappers
+```
+
+Generated wrappers call `agent-journal` through `PATH`. Add the package bin
+directory to `PATH` before the real agent binaries:
+
+```bash
+export PATH="$HOME/.agent-journal/bin:$PATH"
+```
+
+If `agent-journal` is missing from `PATH`, a generated wrapper still runs the
+real agent and preserves its exit code, but prints a warning and skips journal
+event writes for that invocation.
+
 ## Wrapper Setup
 
 Install wrappers:
@@ -49,6 +137,20 @@ The MVP semantic tools are:
 - `journal_daily_report`
 
 MCP responses are intentionally short to preserve model context.
+
+## Release Checklist
+
+Before tagging or sharing a build:
+
+```bash
+uv lock --check
+uv run pytest -q
+scripts/verify.sh
+scripts/package-smoke.sh
+```
+
+Confirm `pyproject.toml` has the intended version and console scripts, and that
+`uv.lock` is committed with dependency changes.
 
 ## Daily Report
 
