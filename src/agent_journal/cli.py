@@ -9,7 +9,7 @@ from typing import Sequence
 
 from agent_journal.config import journal_root
 from agent_journal.events import normalize_event
-from agent_journal.git_context import get_git_context
+from agent_journal.git_context import get_git_context, get_head_commit_files
 from agent_journal.install import (
     claude_mcp_snippet,
     codex_mcp_snippet,
@@ -91,6 +91,10 @@ def _event_from_args(args: argparse.Namespace) -> dict:
     if args.verification_status:
         evidence["verification_status"] = args.verification_status
 
+    files_changed = git_context.get("changed_files") or []
+    if args.event_type == "git_commit":
+        files_changed = get_head_commit_files(cwd)
+
     return normalize_event(
         {
             "event_type": args.event_type,
@@ -103,7 +107,7 @@ def _event_from_args(args: argparse.Namespace) -> dict:
             "command": args.agent_command,
             "exit_code": args.exit_code,
             "duration_ms": args.duration_ms,
-            "files_changed": git_context.get("changed_files") or [],
+            "files_changed": files_changed,
             "semantic": semantic,
             "evidence": evidence,
         }

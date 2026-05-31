@@ -5,11 +5,26 @@ from pathlib import Path
 
 
 WRAPPER_BODY = """#!/usr/bin/env sh
+set -u
 AGENT_JOURNAL_AGENT="{agent}"
 AGENT_JOURNAL_REAL_BIN="{real_bin}"
 export AGENT_JOURNAL_AGENT
 export AGENT_JOURNAL_REAL_BIN
-exec "{wrapper}" "$@"
+AGENT="$AGENT_JOURNAL_AGENT"
+SESSION_ID="$(date +%s)-$$"
+START_TS="$(date +%s)"
+
+journal_event() {{
+  agent-journal event "$@" >/dev/null 2>&1 || true
+}}
+
+journal_event --type agent_start --agent "$AGENT" --session-id "$SESSION_ID" --command "$AGENT"
+"$AGENT_JOURNAL_REAL_BIN" "$@"
+STATUS=$?
+END_TS="$(date +%s)"
+DURATION_MS=$(( (END_TS - START_TS) * 1000 ))
+journal_event --type agent_end --agent "$AGENT" --session-id "$SESSION_ID" --command "$AGENT" --exit-code "$STATUS" --duration-ms "$DURATION_MS"
+exit "$STATUS"
 """
 
 
@@ -22,7 +37,7 @@ def wrapper_source() -> Path:
 
 
 def generate_wrapper_script(agent: str, real_bin: str, wrapper: str | None = None) -> str:
-    return WRAPPER_BODY.format(agent=agent, real_bin=real_bin, wrapper=wrapper or str(wrapper_source()))
+    return WRAPPER_BODY.format(agent=agent, real_bin=real_bin)
 
 
 def install_wrappers(root: str | Path, real_bins: dict[str, str] | None = None) -> dict[str, Path]:

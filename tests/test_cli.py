@@ -101,3 +101,26 @@ def test_wrapper_preserves_exit_code_and_logs_events(tmp_path):
     event_file = next((tmp_path / "journal" / "events").glob("*.jsonl"))
     event_types = [json.loads(line)["event_type"] for line in event_file.read_text().splitlines()]
     assert event_types == ["agent_start", "agent_end"]
+
+
+def test_git_commit_event_records_head_commit_and_committed_files(tmp_path, monkeypatch):
+    journal = tmp_path / "journal"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True)
+    (repo / "tracked.txt").write_text("hello\n")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "add tracked"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(journal))
+    monkeypatch.chdir(repo)
+
+    exit_code = main(["event", "--type", "git_commit", "--agent", "git"])
+
+    assert exit_code == 0
+    event_file = next((journal / "events").glob("*.jsonl"))
+    event = json.loads(event_file.read_text().splitlines()[0])
+    assert event["commit"] == head
+    assert event["files_changed"] == ["tracked.txt"]

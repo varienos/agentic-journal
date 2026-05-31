@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import Any
 
 
@@ -31,23 +30,23 @@ def classify_daily_work(events: list[dict[str, Any]]) -> dict[str, list[str]]:
         "blocked": [],
         "risky": [],
     }
-    passed_verification_by_repo: defaultdict[str, bool] = defaultdict(bool)
+    passed_verification_by_commit: set[str] = set()
     commits: list[dict[str, Any]] = []
 
     for event in events:
-        repo = event.get("repo") or event.get("cwd") or ""
         evidence = event.get("evidence") or {}
-        if event.get("event_type") == "verification" and evidence.get("verification_status") == "passed":
-            passed_verification_by_repo[repo] = True
+        if (
+            event.get("event_type") == "verification"
+            and evidence.get("verification_status") == "passed"
+            and event.get("commit")
+        ):
+            passed_verification_by_commit.add(event["commit"])
         if event.get("event_type") == "git_commit":
             commits.append(event)
 
-    verified_commits = set()
     for event in commits:
-        repo = event.get("repo") or event.get("cwd") or ""
-        if event.get("commit") and passed_verification_by_repo[repo]:
+        if event.get("commit") and event.get("commit") in passed_verification_by_commit:
             classified["completed_verified"].append(_label(event))
-            verified_commits.add(event.get("commit"))
         elif event.get("commit"):
             classified["in_progress"].append(_label(event))
 
@@ -100,4 +99,3 @@ def render_markdown_report(date: str, classified: dict[str, list[str]], raw_even
 
     lines.extend(["## Raw Event Count", f"- {raw_event_count}", ""])
     return "\n".join(lines)
-

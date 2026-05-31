@@ -13,7 +13,7 @@ ASSIGNMENT_SECRET_RE = re.compile(
     r"\b([A-Z0-9_]*(?:API_KEY|TOKEN|SECRET|PASSWORD)[A-Z0-9_]*)=([^\s]+)",
     re.IGNORECASE,
 )
-LONG_TOKEN_RE = re.compile(r"\b(?:sk-[A-Za-z0-9_-]{8,}|[A-Za-z0-9_-]{32,})\b")
+OPENAI_STYLE_KEY_RE = re.compile(r"\bsk-[A-Za-z0-9_-]{8,}\b")
 
 
 def redact_value(value: Any) -> Any:
@@ -32,7 +32,6 @@ def redact_value(value: Any) -> Any:
     if isinstance(value, str):
         value = BEARER_RE.sub(r"\1[REDACTED]", value)
         value = ASSIGNMENT_SECRET_RE.sub(r"\1=[REDACTED]", value)
-        value = LONG_TOKEN_RE.sub("[REDACTED]", value)
+        value = OPENAI_STYLE_KEY_RE.sub("[REDACTED]", value)
         return value
     return value
-

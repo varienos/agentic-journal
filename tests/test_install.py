@@ -11,6 +11,8 @@ def test_generate_wrapper_script_points_to_real_binary():
 
     assert "AGENT_JOURNAL_AGENT=\"codex\"" in script
     assert "AGENT_JOURNAL_REAL_BIN=\"/usr/local/bin/codex\"" in script
+    assert "scripts/wrappers" not in script
+    assert "agent-journal event" in script
 
 
 def test_install_wrappers_creates_agent_bins(tmp_path):

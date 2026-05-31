@@ -20,7 +20,7 @@ def _git(cwd: Path, *args: str) -> str | None:
         return None
     if result.returncode != 0:
         return None
-    return result.stdout.strip()
+    return result.stdout.rstrip("\n")
 
 
 def get_git_context(cwd: str | Path) -> dict[str, Any]:
@@ -51,3 +51,9 @@ def get_git_context(cwd: str | Path) -> dict[str, Any]:
         "changed_files": changed_files,
     }
 
+
+def get_head_commit_files(cwd: str | Path) -> list[str]:
+    output = _git(Path(cwd), "show", "--pretty=", "--name-only", "HEAD")
+    if not output:
+        return []
+    return [line.strip() for line in output.splitlines() if line.strip()]

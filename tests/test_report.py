@@ -8,6 +8,7 @@ def test_commit_with_verification_is_completed_verified():
             {
                 "event_type": "verification",
                 "repo": "/repo",
+                "commit": "abc123",
                 "agent": "codex",
                 "evidence": {"verification_status": "passed"},
             },
@@ -15,6 +16,25 @@ def test_commit_with_verification_is_completed_verified():
     )
 
     assert items["completed_verified"]
+
+
+def test_verification_only_marks_matching_commit_verified():
+    items = classify_daily_work(
+        [
+            {"event_type": "git_commit", "commit": "c1", "repo": "/repo", "agent": "git"},
+            {"event_type": "git_commit", "commit": "c2", "repo": "/repo", "agent": "git"},
+            {
+                "event_type": "verification",
+                "repo": "/repo",
+                "commit": "c1",
+                "agent": "codex",
+                "evidence": {"verification_status": "passed"},
+            },
+        ]
+    )
+
+    assert items["completed_verified"] == ["c1 - agent=git - repo=/repo"]
+    assert items["in_progress"] == ["c2 - agent=git - repo=/repo"]
 
 
 def test_completion_claim_without_commit_is_claimed():
@@ -46,4 +66,3 @@ def test_render_markdown_report_includes_required_sections():
     assert "Completed Verified" in markdown
     assert "Risky / Needs Review" in markdown
     assert "Raw Event Count" in markdown
-

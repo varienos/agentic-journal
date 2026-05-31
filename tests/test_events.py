@@ -33,3 +33,10 @@ def test_normalize_event_redacts_sensitive_values():
 
     assert "secret-token-value" not in event["semantic"]["note"]
 
+
+def test_normalize_event_preserves_commit_hashes():
+    commit = "a" * 40
+
+    event = normalize_event({"event_type": "git_commit", "agent": "git", "commit": commit})
+
+    assert event["commit"] == commit
