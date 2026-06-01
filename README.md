@@ -1,5 +1,9 @@
 # Agent Journal
 
+[![CI](https://github.com/varienos/agent-journal/actions/workflows/ci.yml/badge.svg)](https://github.com/varienos/agent-journal/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%2B-2f6f9f)
+![Local First](https://img.shields.io/badge/local--first-agent%20journal-126b5f)
+
 Agent Journal is a local, observer-first activity journal for AI coding agents.
 It records verifiable events from Codex, Claude Code, Gemini CLI, git commits,
 and semantic MCP notes, then produces daily Markdown reports and a live local
@@ -34,6 +38,14 @@ The project is intentionally local-first. Runtime data is stored under
 - JSONL and SQLite event storage
 
 ## Install
+
+Clone the GitHub repo:
+
+```bash
+git clone https://github.com/varienos/agent-journal.git
+cd agent-journal
+uv sync --dev
+```
 
 From the source checkout:
 
