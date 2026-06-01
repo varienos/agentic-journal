@@ -6,6 +6,7 @@ from pathlib import Path
 
 from agent_journal.cli import main
 from agent_journal.install import generate_wrapper_script
+from agent_journal.mcp_server import journal_task_blocked, journal_task_completed
 
 
 def test_main_help_exits_cleanly(capsys):
@@ -124,6 +125,7 @@ def test_web_help_exits_cleanly(capsys):
     assert "--host" in output
     assert "--port" in output
     assert "--date" in output
+    assert "--token" in output
 
 
 def test_guard_session_end_writes_risky_fallback_when_semantic_entry_is_missing(tmp_path, monkeypatch, capsys):
@@ -211,6 +213,36 @@ def test_guard_session_end_skips_when_session_summary_exists(tmp_path, monkeypat
     event_file = next((tmp_path / "events").glob("*.jsonl"))
     events = [json.loads(line) for line in event_file.read_text().splitlines()]
     assert [event["event_type"] for event in events] == ["agent_start", "session_summary"]
+
+
+def test_guard_session_end_skips_when_mcp_task_completed_uses_session_env(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENT_JOURNAL_SESSION_ID", "session-5")
+    main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-5"])
+    journal_task_completed(agent="claude", task_id="TASK-5", note="Done")
+
+    exit_code = main(["guard", "session-end", "--agent", "claude", "--session-id", "session-5"])
+
+    assert exit_code == 0
+    assert "semantic journal entry exists" in capsys.readouterr().out
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    events = [json.loads(line) for line in event_file.read_text().splitlines()]
+    assert [event["event_type"] for event in events] == ["agent_start", "task_completed_claim"]
+
+
+def test_guard_session_end_skips_when_mcp_task_blocked_uses_session_env(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENT_JOURNAL_SESSION_ID", "session-6")
+    main(["event", "--type", "agent_start", "--agent", "gemini", "--session-id", "session-6"])
+    journal_task_blocked(agent="gemini", task_id="TASK-6", reason="Missing key")
+
+    exit_code = main(["guard", "session-end", "--agent", "gemini", "--session-id", "session-6"])
+
+    assert exit_code == 0
+    assert "semantic journal entry exists" in capsys.readouterr().out
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    events = [json.loads(line) for line in event_file.read_text().splitlines()]
+    assert [event["event_type"] for event in events] == ["agent_start", "task_blocked"]
 
 
 def test_wrapper_preserves_exit_code_and_logs_events(tmp_path):

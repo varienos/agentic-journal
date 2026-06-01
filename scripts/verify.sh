@@ -92,4 +92,40 @@ expected = {
 assert expected.issubset(set(server._tool_manager._tools))
 PY
 
+uv run python - <<PY
+from agent_journal.events import normalize_event
+from agent_journal.storage import write_event
+from agent_journal.web import create_web_handler
+from http.server import ThreadingHTTPServer
+import http.client
+import json
+import threading
+
+root = "$TMP_ROOT/token-journal"
+write_event(root, normalize_event({
+    "event_type": "semantic_note",
+    "agent": "codex",
+    "semantic": {"note": "token smoke"},
+}))
+server = ThreadingHTTPServer(("127.0.0.1", 0), create_web_handler(root, "$(date +%F)", api_token="secret"))
+thread = threading.Thread(target=server.serve_forever, daemon=True)
+thread.start()
+host, port = server.server_address
+conn = http.client.HTTPConnection(host, port, timeout=5)
+try:
+    conn.request("GET", "/api/events")
+    response = conn.getresponse()
+    response.read()
+    assert response.status == 401
+    conn.request("GET", "/api/events", headers={"X-Agent-Journal-Token": "secret"})
+    response = conn.getresponse()
+    body = response.read()
+    assert response.status == 200
+    assert json.loads(body)["raw_event_count"] == 1
+finally:
+    conn.close()
+    server.shutdown()
+    server.server_close()
+PY
+
 echo "agent-journal verification passed"

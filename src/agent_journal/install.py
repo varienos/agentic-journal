@@ -41,7 +41,15 @@ exit "$STATUS"
 """
 
 GIT_HOOK_BODY = """#!/usr/bin/env sh
+STATUS=0
+BACKUP="$(dirname "$0")/post-commit.agent-journal.bak"
+if [ -x "$BACKUP" ]; then
+  "$BACKUP" "$@" || STATUS=$?
+elif [ -f "$BACKUP" ]; then
+  /usr/bin/env sh "$BACKUP" "$@" || STATUS=$?
+fi
 agent-journal event --type git_commit --agent "${AGENT_JOURNAL_AGENT:-git}" >/dev/null 2>&1 || true
+exit "$STATUS"
 """
 
 
@@ -82,7 +90,8 @@ def install_git_hook(repo: str | Path) -> Path:
     if target.exists():
         backup = hooks_dir / "post-commit.agent-journal.bak"
         if not backup.exists():
-            backup.write_text(target.read_text(encoding="utf-8"), encoding="utf-8")
+            backup.write_bytes(target.read_bytes())
+            backup.chmod(target.stat().st_mode)
     target.write_text(GIT_HOOK_BODY, encoding="utf-8")
     target.chmod(0o755)
     return target

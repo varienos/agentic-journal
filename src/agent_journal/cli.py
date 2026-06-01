@@ -67,6 +67,7 @@ def _add_web_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPars
     parser.add_argument("--today", action="store_true")
     parser.add_argument("--date")
     parser.add_argument("--refresh-ms", type=int, default=2000)
+    parser.add_argument("--token", help="Require this token for /api/events requests")
 
 
 def _add_install_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -197,7 +198,14 @@ def _handle_status(args: argparse.Namespace) -> int:
 
 
 def _handle_web(args: argparse.Namespace) -> int:
-    run_web_server(journal_root(), args.host, args.port, _report_date(args), refresh_ms=args.refresh_ms)
+    run_web_server(
+        journal_root(),
+        args.host,
+        args.port,
+        _report_date(args),
+        refresh_ms=args.refresh_ms,
+        api_token=args.token,
+    )
     return 0
 
 

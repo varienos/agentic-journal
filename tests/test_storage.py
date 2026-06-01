@@ -44,3 +44,24 @@ def test_sqlite_storage_uses_wal_and_reads_by_date(tmp_path):
     assert len(events) == 1
     assert events[0]["event_id"] == "e1"
 
+
+def test_write_event_keeps_jsonl_mirror_idempotent(tmp_path):
+    from agent_journal.storage import write_event
+
+    root = tmp_path / "journal"
+    event = {
+        "schema_version": 1,
+        "event_id": "e1",
+        "ts": "2026-05-31T10:00:00+03:00",
+        "event_type": "agent_start",
+        "agent": "codex",
+        "semantic": {},
+        "evidence": {},
+    }
+
+    path = write_event(root, event)
+    second_path = write_event(root, event)
+
+    assert second_path == path
+    assert list(read_jsonl_events(path)) == [event]
+    assert len(read_events_for_date(root, "2026-05-31")) == 1

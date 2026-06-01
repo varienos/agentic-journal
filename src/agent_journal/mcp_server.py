@@ -4,14 +4,33 @@ import os
 from pathlib import Path
 
 from agent_journal.events import normalize_event
+from agent_journal.git_context import get_git_context
 from agent_journal.storage import read_events_for_date, write_event
 
 
-def journal_note(journal_home: str | Path | None = None, agent: str = "unknown", note: str = "") -> str:
+def _event_context(session_id: str | None = None) -> dict:
+    cwd = Path.cwd()
+    git_context = get_git_context(cwd)
+    return {
+        "session_id": session_id or os.environ.get("AGENT_JOURNAL_SESSION_ID"),
+        "cwd": str(cwd),
+        "repo": git_context.get("repo"),
+        "branch": git_context.get("branch"),
+        "commit": git_context.get("commit"),
+    }
+
+
+def journal_note(
+    journal_home: str | Path | None = None,
+    agent: str = "unknown",
+    note: str = "",
+    session_id: str | None = None,
+) -> str:
     event = normalize_event(
         {
             "event_type": "semantic_note",
             "agent": agent,
+            **_event_context(session_id),
             "semantic": {"note": note},
         }
     )
@@ -24,11 +43,13 @@ def journal_task_completed(
     agent: str = "unknown",
     task_id: str | None = None,
     note: str = "",
+    session_id: str | None = None,
 ) -> str:
     event = normalize_event(
         {
             "event_type": "task_completed_claim",
             "agent": agent,
+            **_event_context(session_id),
             "semantic": {"task_id": task_id, "status": "completed_claimed", "note": note},
         }
     )
@@ -51,7 +72,7 @@ def journal_session_summary(
         {
             "event_type": "session_summary",
             "agent": agent,
-            "session_id": session_id or os.environ.get("AGENT_JOURNAL_SESSION_ID"),
+            **_event_context(session_id),
             "semantic": semantic,
         }
     )
@@ -64,11 +85,13 @@ def journal_task_blocked(
     agent: str = "unknown",
     task_id: str | None = None,
     reason: str = "",
+    session_id: str | None = None,
 ) -> str:
     event = normalize_event(
         {
             "event_type": "task_blocked",
             "agent": agent,
+            **_event_context(session_id),
             "semantic": {"task_id": task_id, "status": "blocked", "reason": reason},
         }
     )
@@ -100,8 +123,8 @@ def create_mcp_server():
     server = FastMCP("agent-journal")
 
     @server.tool(name="journal_note")
-    def journal_note_tool(agent: str = "unknown", note: str = "") -> str:
-        return journal_note(agent=agent, note=note)
+    def journal_note_tool(agent: str = "unknown", note: str = "", session_id: str = "") -> str:
+        return journal_note(agent=agent, note=note, session_id=session_id or None)
 
     @server.tool(name="journal_session_summary")
     def journal_session_summary_tool(
@@ -120,12 +143,22 @@ def create_mcp_server():
         )
 
     @server.tool(name="journal_task_completed")
-    def journal_task_completed_tool(agent: str = "unknown", task_id: str = "", note: str = "") -> str:
-        return journal_task_completed(agent=agent, task_id=task_id, note=note)
+    def journal_task_completed_tool(
+        agent: str = "unknown",
+        task_id: str = "",
+        note: str = "",
+        session_id: str = "",
+    ) -> str:
+        return journal_task_completed(agent=agent, task_id=task_id, note=note, session_id=session_id or None)
 
     @server.tool(name="journal_task_blocked")
-    def journal_task_blocked_tool(agent: str = "unknown", task_id: str = "", reason: str = "") -> str:
-        return journal_task_blocked(agent=agent, task_id=task_id, reason=reason)
+    def journal_task_blocked_tool(
+        agent: str = "unknown",
+        task_id: str = "",
+        reason: str = "",
+        session_id: str = "",
+    ) -> str:
+        return journal_task_blocked(agent=agent, task_id=task_id, reason=reason, session_id=session_id or None)
 
     @server.tool(name="journal_daily_report")
     def journal_daily_report_tool(date: str = "") -> str:

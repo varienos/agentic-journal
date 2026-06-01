@@ -51,6 +51,9 @@ tools.
 checks packaged console scripts, verifies generated wrappers, and confirms the
 MCP server can be created from the packaged environment.
 
+The smoke suite also checks MCP session context propagation, JSON API token
+enforcement, wrapper guard fallback behavior, and packaged dashboard rendering.
+
 ## Local And Global Install
 
 Run from the source checkout without installing:
@@ -107,6 +110,12 @@ MCP clients should prefer `journal_session_summary` with the same semantic
 fields. Supported outcomes are `completed`, `in_progress`, `blocked`, `no_work`,
 and `unknown`.
 
+MCP tools inherit `AGENT_JOURNAL_SESSION_ID` when present. They also attach the
+current `cwd` and git repo, branch, and commit context from the MCP server
+process. This is important: `journal_task_completed` and `journal_task_blocked`
+only satisfy the guard for a wrapper session when they carry the same
+`session_id` as that wrapper session.
+
 ## Journal Guard
 
 Use the guard command at agent session end to make journaling auditable even when
@@ -155,7 +164,8 @@ agent-journal install git-hook --repo .
 
 The hook records commit metadata without blocking commits. If an existing hook
 is present, the installer writes a `post-commit.agent-journal.bak` backup before
-replacing it.
+replacing it. The generated hook runs that backup first and preserves the
+backup hook's exit code, while the Agent Journal write remains best-effort.
 
 ## MCP Setup
 
@@ -235,5 +245,16 @@ Use a fixed date when reviewing past work:
 agent-journal web --date 2026-06-01 --port 8765
 ```
 
-The web server is local-only by default and does not add authentication. Keep
-`--host 127.0.0.1` unless you intentionally expose it on your network.
+The web server is local-only by default. Keep `--host 127.0.0.1` unless you
+intentionally expose it on your network. If exposure is intentional, require a
+token for the JSON API:
+
+```bash
+agent-journal web --host 0.0.0.0 --port 8765 --today --token "$AGENT_JOURNAL_WEB_TOKEN"
+```
+
+Then open `http://host:8765/?token=...`. The static page reads the token from
+the URL and sends it as `X-Agent-Journal-Token` for `/api/events`. Requests with
+no token or the wrong token receive `401`.
+
+You can also set `AGENT_JOURNAL_WEB_TOKEN` instead of passing `--token`.

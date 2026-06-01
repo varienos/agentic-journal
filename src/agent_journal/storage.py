@@ -79,10 +79,10 @@ def init_db(root: str | Path | None = None) -> Path:
     return path
 
 
-def insert_event(root: str | Path | None, event: dict[str, Any]) -> None:
+def insert_event(root: str | Path | None, event: dict[str, Any]) -> bool:
     init_db(root)
     with connect(root) as conn:
-        conn.execute(
+        cursor = conn.execute(
             """
             INSERT OR IGNORE INTO events (
               event_id, schema_version, ts, event_type, agent, session_id, cwd,
@@ -105,12 +105,15 @@ def insert_event(root: str | Path | None, event: dict[str, Any]) -> None:
                 json.dumps(event, ensure_ascii=False, sort_keys=True),
             ),
         )
+        return cursor.rowcount > 0
 
 
 def write_event(root: str | Path | None, event: dict[str, Any]) -> Path:
     root_path = Path(root).expanduser() if root else journal_root()
-    insert_event(root_path, event)
-    return append_jsonl_event(root_path, event)
+    path = root_path / "events" / f"{_date_from_ts(event['ts'])}.jsonl"
+    if insert_event(root_path, event):
+        return append_jsonl_event(root_path, event)
+    return path
 
 
 def read_events_for_date(root: str | Path | None, date: str | None) -> list[dict[str, Any]]:

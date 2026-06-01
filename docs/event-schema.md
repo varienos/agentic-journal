@@ -44,6 +44,9 @@ Correlation rules:
 - `session_id` links events emitted by the same agent process or MCP session.
   A `task_completed_claim` can become `completed_verified` when a passed
   `verification` event has the same `session_id` and a compatible `repo`.
+- MCP tools inherit `AGENT_JOURNAL_SESSION_ID` and git context from the MCP
+  server process. This lets `journal_task_completed`, `journal_task_blocked`,
+  and `journal_session_summary` correlate with wrapper session lifecycle events.
 - `semantic.task_id` links explicit task claims to explicit verification
   evidence. A `task_completed_claim` can become `completed_verified` when a
   passed `verification` event has the same `semantic.task_id` and a compatible
@@ -60,6 +63,8 @@ Correlation rules:
   `semantic.status = "journal_missing"` when a session ends without a
   `session_summary`, `task_completed_claim`, or `task_blocked` event. Generic
   `semantic_note` entries do not satisfy the session outcome requirement.
+- Duplicate `event_id` writes are ignored so SQLite and the daily JSONL mirror
+  remain aligned.
 
 Privacy rules:
 

@@ -1,9 +1,12 @@
 import json
+import http.client
+import threading
 from datetime import date
+from http.server import ThreadingHTTPServer
 
 from agent_journal.events import normalize_event
 from agent_journal.storage import write_event
-from agent_journal.web import build_events_payload, render_dashboard_html
+from agent_journal.web import build_events_payload, create_web_handler, render_dashboard_html
 
 
 def _event(event_type, ts="2026-06-01T10:00:00+03:00", **updates):
@@ -81,9 +84,39 @@ def test_render_dashboard_html_contains_live_dashboard_controls():
 
     assert "Agent Journal Live" in html
     assert "/api/events" in html
+    assert "X-Agent-Journal-Token" in html
     assert "setInterval" in html
     assert "Session Summaries" in html
     assert "data-section=\"sessions\"" in html
     assert "data-section=\"notes\"" in html
     assert "data-section=\"risky\"" in html
     assert "2026-06-01" in html
+
+
+def test_api_events_requires_token_when_configured(tmp_path):
+    write_event(tmp_path, _event("semantic_note", semantic={"note": "private"}))
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        create_web_handler(tmp_path, "2026-06-01", api_token="secret"),
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    conn = http.client.HTTPConnection(host, port, timeout=5)
+
+    try:
+        conn.request("GET", "/api/events?date=2026-06-01")
+        response = conn.getresponse()
+        body = response.read()
+        assert response.status == 401
+        assert b"unauthorized" in body
+
+        conn.request("GET", "/api/events?date=2026-06-01", headers={"X-Agent-Journal-Token": "secret"})
+        response = conn.getresponse()
+        body = response.read()
+        assert response.status == 200
+        assert json.loads(body)["raw_event_count"] == 1
+    finally:
+        conn.close()
+        server.shutdown()
+        server.server_close()

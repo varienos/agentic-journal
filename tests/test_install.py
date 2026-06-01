@@ -65,6 +65,29 @@ def test_install_git_hook_backs_up_existing_hook(tmp_path):
     assert (hooks / "post-commit.agent-journal.bak").read_text() == "existing\n"
 
 
+def test_install_git_hook_chains_existing_hook(tmp_path):
+    repo = tmp_path / "repo"
+    hooks = repo / ".git" / "hooks"
+    hooks.mkdir(parents=True)
+    existing = hooks / "post-commit"
+    marker = tmp_path / "existing-ran"
+    existing.write_text(f"#!/usr/bin/env sh\nprintf ran > {marker}\n", encoding="utf-8")
+    existing.chmod(0o755)
+    shim = tmp_path / "bin"
+    shim.mkdir()
+    agent_journal = shim / "agent-journal"
+    agent_journal.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+    agent_journal.chmod(0o755)
+
+    installed = install_git_hook(repo)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{shim}:{env['PATH']}"
+    result = subprocess.run([str(installed)], cwd=repo, env=env, check=False)
+    assert result.returncode == 0
+    assert marker.read_text(encoding="utf-8") == "ran"
+
+
 def test_install_git_hook_does_not_depend_on_source_tree(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     monkeypatch.setattr("agent_journal.install.project_root", lambda: tmp_path / "missing-source")

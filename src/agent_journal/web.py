@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+from hmac import compare_digest
 from datetime import date
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -454,7 +456,12 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
 
     async function loadEvents() {{
       const date = dateEl.value;
-      const response = await fetch(`/api/events?date=${{encodeURIComponent(date)}}`, {{ cache: "no-store" }});
+      const token = new URLSearchParams(window.location.search).get("token") || "";
+      const headers = token ? {{ "X-Agent-Journal-Token": token }} : {{}};
+      const response = await fetch(`/api/events?date=${{encodeURIComponent(date)}}`, {{
+        cache: "no-store",
+        headers,
+      }});
       if (!response.ok) throw new Error(`HTTP ${{response.status}}`);
       const payload = await response.json();
       keys.forEach((key) => {{
@@ -486,7 +493,19 @@ def _write_response(handler: BaseHTTPRequestHandler, status: HTTPStatus, body: b
     handler.wfile.write(body)
 
 
-def create_web_handler(root: str | Path | None, default_date: str, refresh_ms: int = 2000):
+def _is_authorized(handler: BaseHTTPRequestHandler, params: dict[str, list[str]], api_token: str | None) -> bool:
+    if not api_token:
+        return True
+    provided = handler.headers.get("X-Agent-Journal-Token") or params.get("token", [""])[0]
+    return compare_digest(provided, api_token)
+
+
+def create_web_handler(
+    root: str | Path | None,
+    default_date: str,
+    refresh_ms: int = 2000,
+    api_token: str | None = None,
+):
     class AgentJournalHandler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:
             return
@@ -499,6 +518,14 @@ def create_web_handler(root: str | Path | None, default_date: str, refresh_ms: i
                 return
             if parsed.path == "/api/events":
                 params = parse_qs(parsed.query)
+                if not _is_authorized(self, params, api_token):
+                    _write_response(
+                        self,
+                        HTTPStatus.UNAUTHORIZED,
+                        b'{"error":"unauthorized"}',
+                        "application/json; charset=utf-8",
+                    )
+                    return
                 report_date = params.get("date", [default_date])[0] or default_date
                 payload = build_events_payload(root, report_date)
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -515,8 +542,10 @@ def run_web_server(
     port: int,
     default_date: str,
     refresh_ms: int = 2000,
+    api_token: str | None = None,
 ) -> None:
-    server = ThreadingHTTPServer((host, port), create_web_handler(root, default_date, refresh_ms))
+    token = api_token or os.environ.get("AGENT_JOURNAL_WEB_TOKEN")
+    server = ThreadingHTTPServer((host, port), create_web_handler(root, default_date, refresh_ms, api_token=token))
     actual_host, actual_port = server.server_address
     print(f"Agent Journal web: http://{actual_host}:{actual_port}")
     try:

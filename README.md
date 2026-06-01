@@ -35,7 +35,7 @@ The project is intentionally local-first. Runtime data is stored under
 - Required session summary events for useful end-of-day reports
 - Git post-commit hook installer
 - Daily Markdown report generation
-- Live web dashboard with auto-refreshing event data
+- Live web dashboard with auto-refreshing event data and optional API token
 - JSONL and SQLite event storage
 
 ## Install
@@ -134,6 +134,11 @@ Available MCP tools:
 - `journal_task_blocked`
 - `journal_daily_report`
 
+MCP writes inherit `AGENT_JOURNAL_SESSION_ID` when present and attach the
+current working directory plus git repo, branch, and commit context. This keeps
+MCP outcome events correlated with wrapper `agent_start` / `agent_end` events
+and prevents the session guard from reporting false missing-summary risks.
+
 ## Guarding Agent Sessions
 
 The wrapper flow exports an `AGENT_JOURNAL_SESSION_ID`, writes `agent_start` and
@@ -158,14 +163,32 @@ Install the post-commit hook into a repo:
 agent-journal install git-hook --repo .
 ```
 
-The hook records commit metadata and changed files without blocking commits.
+The hook records commit metadata and changed files without blocking commits. If
+a `post-commit` hook already exists, the installer backs it up to
+`post-commit.agent-journal.bak` and chains it from the generated hook so the
+existing hook still runs.
+
+## Web Token
+
+The dashboard binds to `127.0.0.1` by default. If you expose it more broadly,
+protect the JSON API with a token:
+
+```bash
+agent-journal web --host 0.0.0.0 --port 8765 --today --token "$AGENT_JOURNAL_WEB_TOKEN"
+```
+
+Open the page with `?token=...`; the browser sends that value as the
+`X-Agent-Journal-Token` header for `/api/events` requests.
 
 ## Storage
 
-Agent Journal writes events to both:
+Agent Journal writes each event to both:
 
 - `~/.agent-journal/events/YYYY-MM-DD.jsonl`
 - `~/.agent-journal/agent-journal.db`
+
+Duplicate `event_id` writes are ignored in both SQLite and the JSONL mirror so
+the two stores stay aligned.
 
 Reports are written to:
 

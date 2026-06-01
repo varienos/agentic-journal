@@ -1,3 +1,5 @@
+import subprocess
+
 from agent_journal.mcp_server import (
     create_mcp_server,
     journal_note,
@@ -6,6 +8,17 @@ from agent_journal.mcp_server import (
     journal_task_completed,
 )
 from agent_journal.storage import read_events_for_date
+
+
+def _init_git_repo(path):
+    path.mkdir()
+    subprocess.run(["git", "init", "-b", "main"], cwd=path, check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=path, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=path, check=True)
+    (path / "tracked.txt").write_text("hello\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=path, check=True)
+    subprocess.run(["git", "commit", "-m", "add tracked"], cwd=path, check=True, stdout=subprocess.DEVNULL)
+    return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=path, text=True).strip()
 
 
 def test_journal_note_writes_semantic_note(tmp_path):
@@ -52,6 +65,31 @@ def test_journal_session_summary_writes_outcome_event(tmp_path):
     assert events[0]["semantic"]["task_id"] == "TASK-8"
     assert events[0]["semantic"]["summary"] == "Implemented session summary logging"
     assert events[0]["semantic"]["outcome"] == "completed"
+
+
+def test_mcp_tools_attach_session_and_git_context(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    head = _init_git_repo(repo)
+    monkeypatch.chdir(repo)
+    monkeypatch.setenv("AGENT_JOURNAL_SESSION_ID", "session-env")
+
+    journal_note(journal_home=tmp_path / "journal", agent="codex", note="Investigated")
+    journal_task_completed(journal_home=tmp_path / "journal", agent="claude", task_id="TASK-2", note="Done")
+    journal_task_blocked(journal_home=tmp_path / "journal", agent="gemini", task_id="TASK-3", reason="Missing key")
+    journal_session_summary(
+        journal_home=tmp_path / "journal",
+        agent="codex",
+        task_id="TASK-8",
+        summary="Implemented session summary logging",
+        outcome="completed",
+    )
+
+    events = read_events_for_date(tmp_path / "journal", None)
+    assert [event["session_id"] for event in events] == ["session-env"] * 4
+    assert {event["repo"] for event in events} == {str(repo)}
+    assert {event["branch"] for event in events} == {"main"}
+    assert {event["commit"] for event in events} == {head}
+    assert {event["cwd"] for event in events} == {str(repo)}
 
 
 def test_create_mcp_server_has_expected_name_or_clear_dependency_error():

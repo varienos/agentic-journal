@@ -32,7 +32,9 @@ payload = build_events_payload("$JOURNAL_HOME", "$(date +%F)")
 assert payload["summary"]["risky"] == 1
 assert payload["summary"]["session_summaries"] == 1
 assert any(session["summary"] == "packaged session summary" for session in payload["sessions"])
-assert "Agent Journal Live" in render_dashboard_html()
+html = render_dashboard_html()
+assert "Agent Journal Live" in html
+assert "X-Agent-Journal-Token" in html
 PY
 
 "$PYTHON" - <<'PY'
@@ -47,6 +49,53 @@ expected = {
     "journal_daily_report",
 }
 assert expected.issubset(set(server._tool_manager._tools))
+PY
+
+AGENT_JOURNAL_HOME="$JOURNAL_HOME" AGENT_JOURNAL_SESSION_ID="PACKAGE-MCP-SESSION" "$PYTHON" - <<'PY'
+from agent_journal.mcp_server import journal_task_completed
+from agent_journal.storage import read_events_for_date
+
+journal_task_completed(agent="claude", task_id="PACKAGE-MCP", note="packaged MCP context")
+events = read_events_for_date(None, None)
+claim = [event for event in events if event["event_type"] == "task_completed_claim"][-1]
+assert claim["session_id"] == "PACKAGE-MCP-SESSION"
+assert claim["cwd"]
+PY
+
+"$PYTHON" - <<PY
+from agent_journal.events import normalize_event
+from agent_journal.storage import write_event
+from agent_journal.web import create_web_handler
+from http.server import ThreadingHTTPServer
+import http.client
+import json
+import threading
+
+root = "$TMP_ROOT/token-journal"
+write_event(root, normalize_event({
+    "event_type": "semantic_note",
+    "agent": "codex",
+    "semantic": {"note": "token smoke"},
+}))
+server = ThreadingHTTPServer(("127.0.0.1", 0), create_web_handler(root, "$(date +%F)", api_token="secret"))
+thread = threading.Thread(target=server.serve_forever, daemon=True)
+thread.start()
+host, port = server.server_address
+conn = http.client.HTTPConnection(host, port, timeout=5)
+try:
+    conn.request("GET", "/api/events")
+    response = conn.getresponse()
+    response.read()
+    assert response.status == 401
+    conn.request("GET", "/api/events", headers={"X-Agent-Journal-Token": "secret"})
+    response = conn.getresponse()
+    body = response.read()
+    assert response.status == 200
+    assert json.loads(body)["raw_event_count"] == 1
+finally:
+    conn.close()
+    server.shutdown()
+    server.server_close()
 PY
 
 mkdir -p "$TMP_ROOT/hook-repo"
