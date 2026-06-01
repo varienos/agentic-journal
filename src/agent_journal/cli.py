@@ -14,7 +14,9 @@ from agent_journal.install import (
     claude_mcp_snippet,
     codex_mcp_snippet,
     gemini_mcp_snippet,
+    install_agent_instructions,
     install_git_hook,
+    install_shell_profile,
     install_wrappers,
 )
 from agent_journal.report import classify_daily_work, render_markdown_report
@@ -74,6 +76,8 @@ def _add_install_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     parser = subparsers.add_parser("install", help="Install wrappers or print setup instructions")
     install_sub = parser.add_subparsers(dest="install_target")
     install_sub.add_parser("wrappers", help="Install codex/claude/gemini wrappers")
+    install_sub.add_parser("shell-profile", help="Add wrapper PATH setup to .zprofile and .zshrc")
+    install_sub.add_parser("agent-instructions", help="Add Agent Journal reporting rules to global agent instruction files")
     git_hook = install_sub.add_parser("git-hook", help="Install post-commit hook into a repo")
     git_hook.add_argument("--repo", default=".")
     install_sub.add_parser("mcp-snippets", help="Print MCP config snippets")
@@ -215,6 +219,14 @@ def _handle_install(args: argparse.Namespace) -> int:
         for agent, path in installed.items():
             print(f"{agent}: {path}")
         print(f'Add this to PATH before real agent binaries: export PATH="{journal_root() / "bin"}:$PATH"')
+        return 0
+    if args.install_target == "shell-profile":
+        for path in install_shell_profile(journal_root()):
+            print(path)
+        return 0
+    if args.install_target == "agent-instructions":
+        for agent, path in install_agent_instructions().items():
+            print(f"{agent}: {path}")
         return 0
     if args.install_target == "git-hook":
         print(install_git_hook(args.repo))

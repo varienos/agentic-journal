@@ -105,6 +105,17 @@ AGENT_JOURNAL_HOME="$TMP_ROOT/hook-journal" \
 test -x "$TMP_ROOT/hook-repo/.git/hooks/post-commit"
 grep -q "agent-journal event --type git_commit" "$TMP_ROOT/hook-repo/.git/hooks/post-commit"
 
+HOME="$TMP_ROOT/home" AGENT_JOURNAL_HOME="$TMP_ROOT/profile-journal" \
+  "$VENV/bin/agent-journal" install shell-profile >"$TMP_ROOT/install-shell-profile.out"
+grep -q "agent-journal wrappers" "$TMP_ROOT/home/.zprofile"
+grep -q "agent-journal wrappers" "$TMP_ROOT/home/.zshrc"
+
+HOME="$TMP_ROOT/home" AGENT_JOURNAL_HOME="$TMP_ROOT/profile-journal" \
+  "$VENV/bin/agent-journal" install agent-instructions >"$TMP_ROOT/install-agent-instructions.out"
+grep -q "journal_session_summary" "$TMP_ROOT/home/.codex/AGENTS.md"
+grep -q "journal_session_summary" "$TMP_ROOT/home/.claude/CLAUDE.md"
+grep -q "journal_session_summary" "$TMP_ROOT/home/.gemini/GEMINI.md"
+
 mkdir -p "$TMP_ROOT/real"
 cat > "$TMP_ROOT/real/codex" <<'SH'
 #!/usr/bin/env sh

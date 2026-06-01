@@ -148,7 +148,25 @@ Install wrappers:
 agent-journal install wrappers
 ```
 
-Then put the generated bin directory before the real agent binaries:
+Install wrapper PATH setup for both login and interactive zsh sessions:
+
+```bash
+agent-journal install shell-profile
+```
+
+This updates `.zprofile` and `.zshrc`. The `.zprofile` entry matters for
+non-interactive login shells and scheduled automations; `.zshrc` covers normal
+interactive terminals.
+
+Install the global instruction block that tells each model to write a semantic
+session summary before final response/session exit:
+
+```bash
+agent-journal install agent-instructions
+```
+
+For one-off shells, put the generated bin directory before the real agent
+binaries manually:
 
 ```bash
 export PATH="$HOME/.agent-journal/bin:$PATH"

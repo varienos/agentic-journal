@@ -4,7 +4,9 @@ import subprocess
 from agent_journal.install import (
     codex_mcp_snippet,
     generate_wrapper_script,
+    install_agent_instructions,
     install_git_hook,
+    install_shell_profile,
     install_wrappers,
 )
 
@@ -49,6 +51,62 @@ def test_install_wrappers_creates_agent_bins(tmp_path):
     assert installed == {"codex": tmp_path / "journal" / "bin" / "codex"}
     assert installed["codex"].exists()
     assert installed["codex"].stat().st_mode & 0o111
+
+
+def test_install_wrappers_skips_existing_wrapper_when_resolving_real_binary(tmp_path, monkeypatch):
+    journal = tmp_path / "journal"
+    wrapper_bin = journal / "bin"
+    wrapper_bin.mkdir(parents=True)
+    existing_wrapper = wrapper_bin / "codex"
+    existing_wrapper.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+    existing_wrapper.chmod(0o755)
+    real_bin = tmp_path / "real" / "codex"
+    real_bin.parent.mkdir()
+    real_bin.write_text("#!/usr/bin/env sh\nexit 0\n", encoding="utf-8")
+    real_bin.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{wrapper_bin}{os.pathsep}{real_bin.parent}")
+
+    installed = install_wrappers(journal)
+
+    assert installed == {"codex": wrapper_bin / "codex"}
+    assert f'AGENT_JOURNAL_REAL_BIN="{real_bin}"' in installed["codex"].read_text(encoding="utf-8")
+
+
+def test_install_shell_profile_adds_wrapper_path_to_login_and_interactive_profiles(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    journal_root = tmp_path / "journal"
+    (home / ".zprofile").write_text('eval "$(/opt/homebrew/bin/brew shellenv)"\n', encoding="utf-8")
+    (home / ".zshrc").write_text("# existing interactive config\n", encoding="utf-8")
+
+    installed = install_shell_profile(journal_root, home=home)
+    install_shell_profile(journal_root, home=home)
+
+    assert installed == [home / ".zprofile", home / ".zshrc"]
+    for profile in installed:
+        text = profile.read_text(encoding="utf-8")
+        assert text.count(">>> agent-journal wrappers >>>") == 1
+        assert f'export PATH="{journal_root / "bin"}:$PATH"' in text
+
+
+def test_install_agent_instructions_requires_session_summary_for_each_agent(tmp_path):
+    instruction_files = {
+        "codex": tmp_path / "AGENTS.md",
+        "claude": tmp_path / "CLAUDE.md",
+        "gemini": tmp_path / "GEMINI.md",
+    }
+    instruction_files["codex"].write_text("@existing\n", encoding="utf-8")
+
+    installed = install_agent_instructions(instruction_files)
+    install_agent_instructions(instruction_files)
+
+    assert installed == instruction_files
+    for path in instruction_files.values():
+        text = path.read_text(encoding="utf-8")
+        assert text.count("Agent Journal Session Reporting") == 1
+        assert "journal_session_summary" in text
+        assert "session_summary" in text
+        assert "journal_note" in text
 
 
 def test_install_git_hook_backs_up_existing_hook(tmp_path):

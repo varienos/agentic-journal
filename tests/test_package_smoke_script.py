@@ -19,6 +19,8 @@ def test_package_smoke_script_declares_packaged_entrypoint_checks():
     assert "agent-journal-mcp" in text
     assert "guard session-end" in text
     assert "install wrappers" in text
+    assert "install shell-profile" in text
+    assert "install agent-instructions" in text
     assert "install git-hook" in text
     assert "AGENT_JOURNAL_HOME" in text
     assert "scripts/wrappers" in text

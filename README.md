@@ -76,7 +76,27 @@ Install wrappers for local agent commands:
 agent-journal install wrappers
 ```
 
-Put the generated wrapper directory before the real agent binaries:
+Install the wrapper PATH block into both login and interactive zsh profiles:
+
+```bash
+agent-journal install shell-profile
+```
+
+This writes the wrapper directory into `.zprofile` and `.zshrc`, so terminal
+sessions and shell-based automations resolve `codex`, `claude`, and `gemini`
+through Agent Journal before the real binaries.
+
+Install the global model instruction that requires end-of-session summaries:
+
+```bash
+agent-journal install agent-instructions
+```
+
+This adds a marked Agent Journal section to Codex, Claude, and Gemini global
+instruction files. Agents should use the MCP `journal_session_summary` tool
+before their final response or session exit.
+
+For one-off shells, the equivalent PATH setup is:
 
 ```bash
 export PATH="$HOME/.agent-journal/bin:$PATH"
