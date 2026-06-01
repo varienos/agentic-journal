@@ -85,6 +85,16 @@ def test_status_command_prints_today_summary(tmp_path, monkeypatch, capsys):
     assert "Raw events:" in capsys.readouterr().out
 
 
+def test_web_help_exits_cleanly(capsys):
+    exit_code = main(["web", "--help"])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "--host" in output
+    assert "--port" in output
+    assert "--date" in output
+
+
 def test_guard_session_end_writes_risky_fallback_when_semantic_entry_is_missing(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-1"])

@@ -196,3 +196,23 @@ Generate today's Agent Journal report by running `agent-journal report --today`.
 Summarize completed_verified, completed_claimed, in_progress, blocked, and risky items.
 Do not modify project files.
 ```
+
+## Live Web Dashboard
+
+Run the local dashboard:
+
+```bash
+agent-journal web --host 127.0.0.1 --port 8765 --today
+```
+
+Open `http://127.0.0.1:8765`. The page polls `/api/events` every two seconds
+and shows summary counters, latest raw events, notes, and risky guard entries.
+
+Use a fixed date when reviewing past work:
+
+```bash
+agent-journal web --date 2026-06-01 --port 8765
+```
+
+The web server is local-only by default and does not add authentication. Keep
+`--host 127.0.0.1` unless you intentionally expose it on your network.

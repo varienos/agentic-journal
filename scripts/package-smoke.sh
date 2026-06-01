@@ -17,9 +17,18 @@ python3 -m venv "$VENV"
 "$PYTHON" -m pip install --no-cache-dir "$TMP_ROOT"/dist/*.whl >/dev/null
 
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" --help >/dev/null
+AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" web --help >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type agent_start --agent codex --session-id PACKAGE-MISSING >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" guard session-end --agent codex --session-id PACKAGE-MISSING >/dev/null
 test -x "$VENV/bin/agent-journal-mcp"
+
+"$PYTHON" - <<PY
+from agent_journal.web import build_events_payload, render_dashboard_html
+
+payload = build_events_payload("$JOURNAL_HOME", "$(date +%F)")
+assert payload["summary"]["risky"] == 1
+assert "Agent Journal Live" in render_dashboard_html()
+PY
 
 "$PYTHON" - <<'PY'
 from agent_journal.mcp_server import create_mcp_server

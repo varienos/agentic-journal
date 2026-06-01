@@ -19,6 +19,7 @@ from agent_journal.install import (
 )
 from agent_journal.report import classify_daily_work, render_markdown_report
 from agent_journal.storage import read_events_for_date, write_event
+from agent_journal.web import run_web_server
 
 SEMANTIC_EVENT_TYPES = {"semantic_note", "task_completed_claim", "task_blocked"}
 JOURNAL_MISSING_STATUS = "journal_missing"
@@ -54,6 +55,15 @@ def _add_status_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
     parser.add_argument("--date")
 
 
+def _add_web_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    parser = subparsers.add_parser("web", help="Run the live web dashboard")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--today", action="store_true")
+    parser.add_argument("--date")
+    parser.add_argument("--refresh-ms", type=int, default=2000)
+
+
 def _add_install_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("install", help="Install wrappers or print setup instructions")
     install_sub = parser.add_subparsers(dest="install_target")
@@ -82,6 +92,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_event_parser(subparsers)
     _add_report_parser(subparsers)
     _add_status_parser(subparsers)
+    _add_web_parser(subparsers)
     _add_install_parser(subparsers)
     _add_guard_parser(subparsers)
     return parser
@@ -172,6 +183,11 @@ def _handle_status(args: argparse.Namespace) -> int:
     print(f"Blocked: {len(classified['blocked'])}")
     print(f"Notes: {len(classified['notes'])}")
     print(f"Risky: {len(classified['risky'])}")
+    return 0
+
+
+def _handle_web(args: argparse.Namespace) -> int:
+    run_web_server(journal_root(), args.host, args.port, _report_date(args), refresh_ms=args.refresh_ms)
     return 0
 
 
@@ -274,6 +290,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_report(args)
     if args.command == "status":
         return _handle_status(args)
+    if args.command == "web":
+        return _handle_web(args)
     if args.command == "install":
         return _handle_install(args)
     if args.command == "guard":

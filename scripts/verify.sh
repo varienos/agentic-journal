@@ -21,6 +21,7 @@ uv run agent-journal guard session-end --agent claude --session-id VERIFY-MISSIN
 uv run agent-journal guard session-end --agent claude --session-id VERIFY-MISSING >/dev/null
 uv run agent-journal report --today --print >/dev/null
 uv run agent-journal status --today >/dev/null
+uv run agent-journal web --help >/dev/null
 
 mkdir -p "$TMP_ROOT/real"
 cat > "$TMP_ROOT/real/codex" <<'SH'
