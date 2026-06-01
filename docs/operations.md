@@ -79,10 +79,13 @@ repo:
 uv tool install .
 agent-journal --help
 agent-journal install wrappers
+agent-journal install shell-profile
+agent-journal install agent-instructions
 ```
 
-Generated wrappers call `agent-journal` through `PATH`. Add the package bin
-directory to `PATH` before the real agent binaries:
+Generated wrappers call `agent-journal` through `PATH`. `install shell-profile`
+adds the package bin directory to both `.zprofile` and `.zshrc` before the real
+agent binaries. For one-off shells, the equivalent manual setup is:
 
 ```bash
 export PATH="$HOME/.agent-journal/bin:$PATH"

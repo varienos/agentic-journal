@@ -233,6 +233,8 @@ scripts/package-smoke.sh
 ```
 
 Operational details live in [docs/operations.md](docs/operations.md).
+The improvement roadmap lives in
+[docs/improvement-plan.md](docs/improvement-plan.md).
 
 ## Privacy
 
