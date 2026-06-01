@@ -18,7 +18,7 @@ them a shared append-only journal so you can review what happened at the end of
 the day in a style close to git history:
 
 - session starts and ends from wrapped agent commands
-- explicit semantic notes from MCP tools
+- explicit session summaries and semantic notes from MCP tools
 - claimed completed tasks, blocked tasks, and verification evidence
 - git commit metadata and changed files
 - risky sessions that ended without a semantic journal entry
@@ -32,6 +32,7 @@ The project is intentionally local-first. Runtime data is stored under
 - MCP server: `agent-journal-mcp`
 - Agent wrappers for `codex`, `claude`, and `gemini`
 - Session-end guard for missing semantic journal entries
+- Required session summary events for useful end-of-day reports
 - Git post-commit hook installer
 - Daily Markdown report generation
 - Live web dashboard with auto-refreshing event data
@@ -87,6 +88,16 @@ Record a manual semantic note:
 agent-journal event --type semantic_note --agent codex --note "Reviewed README setup"
 ```
 
+Record the outcome of an agent session:
+
+```bash
+agent-journal event --type session_summary --agent codex \
+  --session-id "$AGENT_JOURNAL_SESSION_ID" \
+  --task TASK-8 \
+  --summary "Added session summary logging and dashboard grouping" \
+  --outcome completed
+```
+
 Generate today's report:
 
 ```bash
@@ -118,6 +129,7 @@ agent-journal-mcp
 Available MCP tools:
 
 - `journal_note`
+- `journal_session_summary`
 - `journal_task_completed`
 - `journal_task_blocked`
 - `journal_daily_report`
@@ -131,8 +143,10 @@ The wrapper flow exports an `AGENT_JOURNAL_SESSION_ID`, writes `agent_start` and
 agent-journal guard session-end --agent claude --session-id "$AGENT_JOURNAL_SESSION_ID"
 ```
 
-If the session has no `semantic_note`, `task_completed_claim`, or
-`task_blocked`, the guard writes a failed verification event with
+Before final response or session end, agents should call
+`journal_session_summary` with a concise outcome. If the session has no
+`session_summary`, `task_completed_claim`, or `task_blocked`, the guard writes a
+failed verification event with
 `semantic.status = "journal_missing"`. Reports and the web dashboard show that
 session under risky items so silent sessions are visible.
 

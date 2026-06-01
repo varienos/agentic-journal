@@ -14,6 +14,7 @@ ALLOWED_EVENT_TYPES = {
     "git_commit",
     "verification",
     "semantic_note",
+    "session_summary",
     "task_completed_claim",
     "task_blocked",
 }
@@ -45,4 +46,3 @@ def normalize_event(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
     return {key: value for key, value in normalized.items() if value is not None}
-

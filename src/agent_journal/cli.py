@@ -21,7 +21,7 @@ from agent_journal.report import classify_daily_work, render_markdown_report
 from agent_journal.storage import read_events_for_date, write_event
 from agent_journal.web import run_web_server
 
-SEMANTIC_EVENT_TYPES = {"semantic_note", "task_completed_claim", "task_blocked"}
+SESSION_OUTCOME_EVENT_TYPES = {"session_summary", "task_completed_claim", "task_blocked"}
 JOURNAL_MISSING_STATUS = "journal_missing"
 
 
@@ -31,6 +31,11 @@ def _add_event_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     parser.add_argument("--agent", required=True)
     parser.add_argument("--task")
     parser.add_argument("--note")
+    parser.add_argument("--summary")
+    parser.add_argument(
+        "--outcome",
+        choices=["completed", "in_progress", "blocked", "no_work", "unknown"],
+    )
     parser.add_argument("--reason")
     parser.add_argument("--session-id")
     parser.add_argument("--command", dest="agent_command")
@@ -106,6 +111,10 @@ def _event_from_args(args: argparse.Namespace) -> dict:
         semantic["task_id"] = args.task
     if args.note:
         semantic["note"] = args.note
+    if args.summary:
+        semantic["summary"] = args.summary
+    if args.outcome:
+        semantic["outcome"] = args.outcome
     if args.reason:
         semantic["reason"] = args.reason
     if args.event_type == "task_completed_claim":
@@ -179,6 +188,7 @@ def _handle_status(args: argparse.Namespace) -> int:
     print(f"Raw events: {len(events)}")
     print(f"Completed verified: {len(classified['completed_verified'])}")
     print(f"Completed claimed: {len(classified['completed_claimed'])}")
+    print(f"Session summaries: {len(classified['session_summaries'])}")
     print(f"In progress: {len(classified['in_progress'])}")
     print(f"Blocked: {len(classified['blocked'])}")
     print(f"Notes: {len(classified['notes'])}")
@@ -224,7 +234,7 @@ def _has_semantic_session_entry(events: list[dict], session_id: str, agent: str)
     return any(
         _event_matches_session(event, session_id, agent)
         and (
-            event.get("event_type") in SEMANTIC_EVENT_TYPES
+            event.get("event_type") in SESSION_OUTCOME_EVENT_TYPES
             or (event.get("semantic") or {}).get("status") == "blocked"
         )
         for event in events

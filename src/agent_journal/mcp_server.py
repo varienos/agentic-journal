@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from agent_journal.events import normalize_event
@@ -29,6 +30,29 @@ def journal_task_completed(
             "event_type": "task_completed_claim",
             "agent": agent,
             "semantic": {"task_id": task_id, "status": "completed_claimed", "note": note},
+        }
+    )
+    write_event(journal_home, event)
+    return "logged"
+
+
+def journal_session_summary(
+    journal_home: str | Path | None = None,
+    agent: str = "unknown",
+    session_id: str | None = None,
+    task_id: str | None = None,
+    summary: str = "",
+    outcome: str = "unknown",
+) -> str:
+    semantic = {"summary": summary, "outcome": outcome}
+    if task_id:
+        semantic["task_id"] = task_id
+    event = normalize_event(
+        {
+            "event_type": "session_summary",
+            "agent": agent,
+            "session_id": session_id or os.environ.get("AGENT_JOURNAL_SESSION_ID"),
+            "semantic": semantic,
         }
     )
     write_event(journal_home, event)
@@ -78,6 +102,22 @@ def create_mcp_server():
     @server.tool(name="journal_note")
     def journal_note_tool(agent: str = "unknown", note: str = "") -> str:
         return journal_note(agent=agent, note=note)
+
+    @server.tool(name="journal_session_summary")
+    def journal_session_summary_tool(
+        agent: str = "unknown",
+        session_id: str = "",
+        task_id: str = "",
+        summary: str = "",
+        outcome: str = "unknown",
+    ) -> str:
+        return journal_session_summary(
+            agent=agent,
+            session_id=session_id or None,
+            task_id=task_id or None,
+            summary=summary,
+            outcome=outcome,
+        )
 
     @server.tool(name="journal_task_completed")
     def journal_task_completed_tool(agent: str = "unknown", task_id: str = "", note: str = "") -> str:

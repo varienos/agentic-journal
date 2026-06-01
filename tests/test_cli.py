@@ -54,6 +54,37 @@ def test_event_command_accepts_semantic_fields(tmp_path, monkeypatch):
     assert event["semantic"]["note"] == "Smoke test completed"
 
 
+def test_event_command_writes_session_summary_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+
+    exit_code = main(
+        [
+            "event",
+            "--type",
+            "session_summary",
+            "--agent",
+            "codex",
+            "--session-id",
+            "session-1",
+            "--task",
+            "TASK-8",
+            "--summary",
+            "Implemented session summary logging",
+            "--outcome",
+            "completed",
+        ]
+    )
+
+    assert exit_code == 0
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    event = json.loads(event_file.read_text().splitlines()[0])
+    assert event["event_type"] == "session_summary"
+    assert event["session_id"] == "session-1"
+    assert event["semantic"]["task_id"] == "TASK-8"
+    assert event["semantic"]["summary"] == "Implemented session summary logging"
+    assert event["semantic"]["outcome"] == "completed"
+
+
 def test_report_command_writes_markdown(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "task_completed_claim", "--agent", "codex", "--task", "TASK-1"])
@@ -138,6 +169,48 @@ def test_guard_session_end_skips_when_semantic_entry_exists(tmp_path, monkeypatc
     event_file = next((tmp_path / "events").glob("*.jsonl"))
     events = [json.loads(line) for line in event_file.read_text().splitlines()]
     assert [event["event_type"] for event in events] == ["agent_start", "task_completed_claim"]
+
+
+def test_guard_session_end_requires_session_outcome_not_generic_note(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-3"])
+    main(["event", "--type", "semantic_note", "--agent", "claude", "--session-id", "session-3", "--note", "FYI"])
+
+    exit_code = main(["guard", "session-end", "--agent", "claude", "--session-id", "session-3"])
+
+    assert exit_code == 0
+    assert "guarded" in capsys.readouterr().out
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    events = [json.loads(line) for line in event_file.read_text().splitlines()]
+    assert [event["event_type"] for event in events] == ["agent_start", "semantic_note", "verification"]
+
+
+def test_guard_session_end_skips_when_session_summary_exists(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-4"])
+    main(
+        [
+            "event",
+            "--type",
+            "session_summary",
+            "--agent",
+            "claude",
+            "--session-id",
+            "session-4",
+            "--summary",
+            "Reviewed MCP setup",
+            "--outcome",
+            "completed",
+        ]
+    )
+
+    exit_code = main(["guard", "session-end", "--agent", "claude", "--session-id", "session-4"])
+
+    assert exit_code == 0
+    assert "semantic journal entry exists" in capsys.readouterr().out
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    events = [json.loads(line) for line in event_file.read_text().splitlines()]
+    assert [event["event_type"] for event in events] == ["agent_start", "session_summary"]
 
 
 def test_wrapper_preserves_exit_code_and_logs_events(tmp_path):

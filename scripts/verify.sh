@@ -14,6 +14,7 @@ uv run pytest -q
 uv run python -m compileall -q src
 
 uv run agent-journal event --type agent_start --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --note "verify smoke"
+uv run agent-journal event --type session_summary --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --summary "verify smoke session summary" --outcome completed
 uv run agent-journal event --type task_completed_claim --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --note "verify smoke completed"
 uv run agent-journal guard session-end --agent codex --session-id VERIFY-SESSION >/dev/null
 uv run agent-journal event --type agent_start --agent claude --session-id VERIFY-MISSING --note "missing semantic smoke"
@@ -83,6 +84,7 @@ from agent_journal.mcp_server import create_mcp_server
 server = create_mcp_server()
 expected = {
     "journal_note",
+    "journal_session_summary",
     "journal_task_completed",
     "journal_task_blocked",
     "journal_daily_report",

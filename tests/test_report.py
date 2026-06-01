@@ -167,10 +167,61 @@ def test_semantic_notes_are_reported_as_notes():
     assert items["notes"] == ["Claude MCP bağlantısı test edildi - agent=claude - repo=/repo"]
 
 
+def test_session_summary_is_reported_as_session_summary():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "session_summary",
+                "agent": "codex",
+                "session_id": "session-1",
+                "repo": "/repo",
+                "semantic": {
+                    "task_id": "TASK-8",
+                    "summary": "Implemented session summary logging",
+                    "outcome": "completed",
+                },
+            }
+        ]
+    )
+
+    assert items["session_summaries"] == [
+        "TASK-8 - Implemented session summary logging - outcome=completed - agent=codex - repo=/repo"
+    ]
+
+
+def test_session_summary_closes_matching_agent_start_in_report():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "agent_start",
+                "agent": "codex",
+                "session_id": "session-1",
+                "repo": "/repo",
+            },
+            {
+                "event_type": "session_summary",
+                "agent": "codex",
+                "session_id": "session-1",
+                "repo": "/repo",
+                "semantic": {
+                    "summary": "Implemented session summary logging",
+                    "outcome": "completed",
+                },
+            },
+        ]
+    )
+
+    assert items["session_summaries"] == [
+        "Implemented session summary logging - outcome=completed - agent=codex - repo=/repo"
+    ]
+    assert items["in_progress"] == []
+
+
 def test_render_markdown_report_includes_required_sections():
     markdown = render_markdown_report("2026-05-31", classify_daily_work([]), raw_event_count=0)
 
     assert "# 2026-05-31 Agent Journal" in markdown
+    assert "Session Summaries" in markdown
     assert "Completed Verified" in markdown
     assert "Notes" in markdown
     assert "Risky / Needs Review" in markdown

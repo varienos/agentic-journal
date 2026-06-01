@@ -14,6 +14,7 @@ from agent_journal.storage import read_events_for_date
 CLASSIFIED_KEYS = (
     "completed_verified",
     "completed_claimed",
+    "session_summaries",
     "in_progress",
     "blocked",
     "notes",
@@ -25,7 +26,8 @@ def _event_label(event: dict[str, Any]) -> str:
     semantic = event.get("semantic") or {}
     bits = []
     task_id = semantic.get("task_id") or event.get("task_id")
-    note = semantic.get("note") or semantic.get("reason")
+    note = semantic.get("summary") or semantic.get("note") or semantic.get("reason")
+    outcome = semantic.get("outcome")
     commit = event.get("commit")
     if task_id:
         bits.append(str(task_id))
@@ -33,6 +35,8 @@ def _event_label(event: dict[str, Any]) -> str:
         bits.append(str(commit)[:12])
     if note:
         bits.append(str(note))
+    if outcome:
+        bits.append(f"outcome={outcome}")
     bits.append(f"agent={event.get('agent') or 'unknown'}")
     bits.append(f"repo={event.get('repo') or event.get('cwd') or 'unknown'}")
     return " - ".join(bits)
@@ -52,12 +56,59 @@ def _event_view(event: dict[str, Any]) -> dict[str, Any]:
         "commit": event.get("commit"),
         "exit_code": event.get("exit_code"),
         "semantic_status": semantic.get("status"),
+        "outcome": semantic.get("outcome"),
+        "summary": semantic.get("summary"),
         "note": semantic.get("note") or semantic.get("reason"),
         "verification_status": evidence.get("verification_status"),
         "label": _event_label(event),
         "semantic": semantic,
         "evidence": evidence,
     }
+
+
+def _session_key(event: dict[str, Any]) -> tuple[str, str]:
+    return (str(event.get("agent") or "unknown"), str(event.get("session_id") or event.get("event_id")))
+
+
+def build_session_views(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    sessions: dict[tuple[str, str], dict[str, Any]] = {}
+    for event in events:
+        if not event.get("session_id") and event.get("event_type") not in {"agent_start", "agent_end", "session_summary"}:
+            continue
+        key = _session_key(event)
+        semantic = event.get("semantic") or {}
+        session = sessions.setdefault(
+            key,
+            {
+                "agent": event.get("agent") or "unknown",
+                "session_id": event.get("session_id"),
+                "first_ts": event.get("ts"),
+                "last_ts": event.get("ts"),
+                "repo": event.get("repo") or event.get("cwd"),
+                "branch": event.get("branch"),
+                "commit": event.get("commit"),
+                "event_types": [],
+                "summary": None,
+                "outcome": None,
+                "missing_summary": True,
+            },
+        )
+        session["last_ts"] = event.get("ts") or session["last_ts"]
+        session["repo"] = session["repo"] or event.get("repo") or event.get("cwd")
+        session["branch"] = session["branch"] or event.get("branch")
+        session["commit"] = session["commit"] or event.get("commit")
+        session["event_types"].append(event.get("event_type"))
+        if event.get("event_type") == "session_summary":
+            session["summary"] = semantic.get("summary") or "No summary"
+            session["outcome"] = semantic.get("outcome") or "unknown"
+            session["missing_summary"] = False
+    for session in sessions.values():
+        if session["missing_summary"]:
+            session["summary"] = "Summary missing"
+            session["outcome"] = "unknown"
+        if session.get("commit"):
+            session["commit"] = str(session["commit"])[:12]
+    return sorted(sessions.values(), key=lambda item: item.get("last_ts") or "", reverse=True)
 
 
 def build_events_payload(root: str | Path | None, report_date: str, limit: int = 200) -> dict[str, Any]:
@@ -69,6 +120,7 @@ def build_events_payload(root: str | Path | None, report_date: str, limit: int =
         "raw_event_count": len(events),
         "summary": {key: len(classified.get(key, [])) for key in CLASSIFIED_KEYS},
         "classified": {key: classified.get(key, []) for key in CLASSIFIED_KEYS},
+        "sessions": build_session_views(events),
         "latest_events": latest,
     }
 
@@ -167,7 +219,7 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
     }}
     .summary {{
       display: grid;
-      grid-template-columns: repeat(6, minmax(130px, 1fr));
+      grid-template-columns: repeat(7, minmax(120px, 1fr));
       gap: 10px;
       margin: 18px 0;
     }}
@@ -212,11 +264,11 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
       font-size: 15px;
       line-height: 1.3;
     }}
-    .event-list, .bucket-list {{
+    .event-list, .bucket-list, .session-list {{
       display: grid;
       gap: 0;
     }}
-    .event {{
+    .event, .session-row {{
       display: grid;
       grid-template-columns: 170px 120px minmax(0, 1fr);
       gap: 12px;
@@ -224,7 +276,7 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
       border-bottom: 1px solid var(--line);
       min-height: 58px;
     }}
-    .event:last-child, .bucket-item:last-child {{ border-bottom: 0; }}
+    .event:last-child, .session-row:last-child, .bucket-item:last-child {{ border-bottom: 0; }}
     .time, .kind, .bucket-meta {{
       color: var(--muted);
       font-size: 12px;
@@ -236,12 +288,17 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
       overflow-wrap: anywhere;
     }}
     .kind.risky {{ color: var(--warn); }}
+    .session-row.missing .kind {{ color: var(--warn); }}
     .label {{
       font-size: 13px;
       line-height: 1.45;
       overflow-wrap: anywhere;
     }}
     .side {{
+      display: grid;
+      gap: 16px;
+    }}
+    .main-stack {{
       display: grid;
       gap: 16px;
     }}
@@ -283,16 +340,23 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
     <div class="summary">
       <div class="metric"><span>Verified</span><strong id="m-completed_verified">0</strong></div>
       <div class="metric"><span>Claimed</span><strong id="m-completed_claimed">0</strong></div>
+      <div class="metric"><span>Sessions</span><strong id="m-session_summaries">0</strong></div>
       <div class="metric"><span>In Progress</span><strong id="m-in_progress">0</strong></div>
       <div class="metric"><span>Blocked</span><strong id="m-blocked">0</strong></div>
       <div class="metric"><span>Notes</span><strong id="m-notes">0</strong></div>
       <div class="metric"><span>Risky</span><strong id="m-risky">0</strong></div>
     </div>
     <div class="layout">
-      <section>
-        <h2>Latest Events</h2>
-        <div id="events" class="event-list"></div>
-      </section>
+      <div class="main-stack">
+        <section>
+          <h2>Session Summaries</h2>
+          <div id="sessions" class="session-list" data-section="sessions"></div>
+        </section>
+        <section>
+          <h2>Latest Events</h2>
+          <div id="events" class="event-list"></div>
+        </section>
+      </div>
       <div class="side">
         <section data-section="notes">
           <h2>Notes</h2>
@@ -307,10 +371,11 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
   </main>
   <script>
     const refreshMs = {int(refresh_ms)};
-    const keys = ["completed_verified", "completed_claimed", "in_progress", "blocked", "notes", "risky"];
+    const keys = ["completed_verified", "completed_claimed", "session_summaries", "in_progress", "blocked", "notes", "risky"];
     const statusEl = document.getElementById("status");
     const dateEl = document.getElementById("date");
     const eventsEl = document.getElementById("events");
+    const sessionsEl = document.getElementById("sessions");
 
     function text(value) {{
       return value === null || value === undefined || value === "" ? "-" : String(value);
@@ -360,6 +425,33 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
       }});
     }}
 
+    function renderSessions(sessions) {{
+      sessionsEl.innerHTML = "";
+      if (!sessions || sessions.length === 0) {{
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No sessions for this date";
+        sessionsEl.appendChild(empty);
+        return;
+      }}
+      sessions.forEach((session) => {{
+        const row = document.createElement("div");
+        row.className = "session-row" + (session.missing_summary ? " missing" : "");
+        const time = document.createElement("div");
+        time.className = "time";
+        time.textContent = text(session.last_ts);
+        const kind = document.createElement("div");
+        kind.className = "kind";
+        kind.textContent = `${{text(session.agent)}} · ${{text(session.outcome)}}`;
+        const label = document.createElement("div");
+        label.className = "label";
+        const repo = session.repo ? ` · ${{session.repo}}` : "";
+        label.textContent = `${{text(session.summary)}}${{repo}}`;
+        row.append(time, kind, label);
+        sessionsEl.appendChild(row);
+      }});
+    }}
+
     async function loadEvents() {{
       const date = dateEl.value;
       const response = await fetch(`/api/events?date=${{encodeURIComponent(date)}}`, {{ cache: "no-store" }});
@@ -368,6 +460,7 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
       keys.forEach((key) => {{
         document.getElementById(`m-${{key}}`).textContent = payload.summary[key] || 0;
       }});
+      renderSessions(payload.sessions);
       renderEvents(payload.latest_events);
       renderBucket("notes", payload.classified.notes);
       renderBucket("risky", payload.classified.risky);

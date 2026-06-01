@@ -40,3 +40,22 @@ def test_normalize_event_preserves_commit_hashes():
     event = normalize_event({"event_type": "git_commit", "agent": "git", "commit": commit})
 
     assert event["commit"] == commit
+
+
+def test_normalize_event_accepts_session_summary():
+    event = normalize_event(
+        {
+            "event_type": "session_summary",
+            "agent": "codex",
+            "session_id": "session-1",
+            "semantic": {
+                "summary": "Implemented session summary logging",
+                "outcome": "completed",
+                "task_id": "TASK-8",
+            },
+        }
+    )
+
+    assert event["event_type"] == "session_summary"
+    assert event["semantic"]["summary"] == "Implemented session summary logging"
+    assert event["semantic"]["outcome"] == "completed"

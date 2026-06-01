@@ -25,6 +25,17 @@ Common optional fields:
 - `semantic`
 - `evidence`
 
+Outcome events:
+
+- `session_summary` is the preferred end-of-session semantic event for daily
+  reporting.
+- `semantic.summary` should be a concise human-readable description of what the
+  agent did.
+- `semantic.outcome` should be one of `completed`, `in_progress`, `blocked`,
+  `no_work`, or `unknown`.
+- `semantic.task_id` should be set when the session maps to a Backlog task or
+  other stable task identifier.
+
 Correlation rules:
 
 - `commit` is the strongest verification key. A `git_commit` item is
@@ -47,7 +58,8 @@ Correlation rules:
   tasks or commits.
 - `agent-journal guard session-end` writes a failed `verification` event with
   `semantic.status = "journal_missing"` when a session ends without a
-  `semantic_note`, `task_completed_claim`, or `task_blocked` event.
+  `session_summary`, `task_completed_claim`, or `task_blocked` event. Generic
+  `semantic_note` entries do not satisfy the session outcome requirement.
 
 Privacy rules:
 

@@ -20,6 +20,9 @@ AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" --help >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" web --help >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type agent_start --agent codex --session-id PACKAGE-MISSING >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" guard session-end --agent codex --session-id PACKAGE-MISSING >/dev/null
+AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type agent_start --agent codex --session-id PACKAGE-SUMMARY >/dev/null
+AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type session_summary --agent codex --session-id PACKAGE-SUMMARY --task PACKAGE-SMOKE --summary "packaged session summary" --outcome completed >/dev/null
+AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" guard session-end --agent codex --session-id PACKAGE-SUMMARY >/dev/null
 test -x "$VENV/bin/agent-journal-mcp"
 
 "$PYTHON" - <<PY
@@ -27,6 +30,8 @@ from agent_journal.web import build_events_payload, render_dashboard_html
 
 payload = build_events_payload("$JOURNAL_HOME", "$(date +%F)")
 assert payload["summary"]["risky"] == 1
+assert payload["summary"]["session_summaries"] == 1
+assert any(session["summary"] == "packaged session summary" for session in payload["sessions"])
 assert "Agent Journal Live" in render_dashboard_html()
 PY
 
@@ -36,6 +41,7 @@ from agent_journal.mcp_server import create_mcp_server
 server = create_mcp_server()
 expected = {
     "journal_note",
+    "journal_session_summary",
     "journal_task_completed",
     "journal_task_blocked",
     "journal_daily_report",
