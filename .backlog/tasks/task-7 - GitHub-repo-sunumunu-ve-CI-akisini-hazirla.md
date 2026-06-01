@@ -4,7 +4,7 @@ title: GitHub repo sunumunu ve CI akisini hazirla
 status: Done
 assignee: []
 created_date: '2026-06-01 05:51'
-updated_date: '2026-06-01 05:55'
+updated_date: '2026-06-01 05:57'
 labels:
   - github
   - ci
@@ -32,5 +32,5 @@ GitHub'a push oncesi Agent Journal reposunu GitHub uzerinde okunabilir ve dogrul
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-GitHub sunumu icin README badge ve clone akisi eklendi, GitHub Actions CI workflow'u test/verify/package-smoke adimlariyla eklendi, remote origin varienos/agent-journal olarak dogrulandi. Dogrulama: uv sync --dev --locked; scripts/verify.sh; scripts/package-smoke.sh; git diff --check.
+GitHub sunumu icin README badge ve clone akisi eklendi. GitHub Actions CI workflow'u test/verify/package-smoke adimlariyla eklendi ve actions/checkout ile actions/setup-python v6 taglerine yukseltildi. Remote origin varienos/agent-journal olarak dogrulandi. Dogrulama: uv sync --dev --locked; scripts/verify.sh; scripts/package-smoke.sh; git diff --check; GitHub CI run'i geciyor.
 <!-- SECTION:FINAL_SUMMARY:END -->
