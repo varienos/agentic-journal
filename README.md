@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/varienos/agent-journal/actions/workflows/ci.yml/badge.svg)](https://github.com/varienos/agent-journal/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-2f6f9f)
+![License](https://img.shields.io/badge/license-MIT-2f6f9f)
 ![Local First](https://img.shields.io/badge/local--first-agent%20journal-126b5f)
 
 Agent Journal is a local, observer-first activity journal for AI coding agents.
@@ -242,3 +243,7 @@ Agent Journal is designed to avoid prompt transcript capture by default. Event
 writers should not log full file contents, prompt bodies, or secrets. Known API
 keys, bearer tokens, passwords, and secret-looking values are redacted by the
 event normalization path.
+
+## License
+
+Agent Journal is released under the [MIT License](LICENSE).

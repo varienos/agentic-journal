@@ -3,13 +3,26 @@ name = "agent-journal"
 version = "0.1.0"
 description = "Local observer-first activity journal for AI coding agents."
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
   "mcp>=1.23",
 ]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Topic :: Software Development :: Version Control :: Git",
+  "Topic :: Utilities",
+]
 
 [project.urls]
 Repository = "https://github.com/varienos/agent-journal"
+Documentation = "https://github.com/varienos/agent-journal/tree/main/docs"
+Issues = "https://github.com/varienos/agent-journal/issues"
 
 [project.scripts]
 agent-journal = "agent_journal.cli:entrypoint"
