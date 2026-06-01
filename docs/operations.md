@@ -88,6 +88,30 @@ If `agent-journal` is missing from `PATH`, a generated wrapper still runs the
 real agent and preserves its exit code, but prints a warning and skips journal
 event writes for that invocation.
 
+## Journal Guard
+
+Use the guard command at agent session end to make journaling auditable even when
+the model does not voluntarily call an MCP tool:
+
+```bash
+agent-journal guard session-end --agent claude --session-id "$AGENT_JOURNAL_SESSION_ID"
+```
+
+If the session already has a `semantic_note`, `task_completed_claim`, or
+`task_blocked` event, the guard is a no-op. If not, it writes one failed
+verification event with `semantic.status = "journal_missing"`, which appears in
+the Risky / Needs Review section of the daily report. Running the guard multiple
+times for the same session is idempotent.
+
+Generated wrappers export `AGENT_JOURNAL_SESSION_ID` and call the guard after
+`agent_end`, so wrapped Codex, Claude, and Gemini sessions are automatically
+flagged when they finish without a semantic journal entry.
+
+For native agent hook systems, wire the same command into the stop/session-end
+hook and pass the agent name used by that runtime. Keep MCP instructions in
+place so models can still write richer semantic entries during or before final
+responses.
+
 ## Wrapper Setup
 
 Install wrappers:

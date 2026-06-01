@@ -53,6 +53,7 @@ def classify_daily_work(events: list[dict[str, Any]]) -> dict[str, list[str]]:
         "completed_claimed": [],
         "in_progress": [],
         "blocked": [],
+        "notes": [],
         "risky": [],
     }
     passed_verification_by_commit: set[str] = set()
@@ -88,6 +89,8 @@ def classify_daily_work(events: list[dict[str, Any]]) -> dict[str, list[str]]:
                 classified["completed_claimed"].append(_label(event))
         elif event_type == "task_blocked" or semantic.get("status") == "blocked":
             classified["blocked"].append(_label(event))
+        elif event_type == "semantic_note":
+            classified["notes"].append(_label(event))
         elif event_type == "agent_end" and event.get("exit_code") not in (None, 0):
             classified["risky"].append(_label(event))
         elif event_type == "verification" and evidence.get("verification_status") == "failed":
@@ -107,6 +110,7 @@ def render_markdown_report(date: str, classified: dict[str, list[str]], raw_even
         f"- Completed claimed: {len(classified.get('completed_claimed', []))}",
         f"- In progress: {len(classified.get('in_progress', []))}",
         f"- Blocked: {len(classified.get('blocked', []))}",
+        f"- Notes: {len(classified.get('notes', []))}",
         f"- Risky / needs review: {len(classified.get('risky', []))}",
         "",
     ]
@@ -116,6 +120,7 @@ def render_markdown_report(date: str, classified: dict[str, list[str]], raw_even
         ("Completed Claimed", "completed_claimed"),
         ("In Progress", "in_progress"),
         ("Blocked", "blocked"),
+        ("Notes", "notes"),
         ("Risky / Needs Review", "risky"),
     ]
     for title, key in sections:

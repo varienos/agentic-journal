@@ -14,8 +14,10 @@ def test_generate_wrapper_script_points_to_real_binary():
 
     assert "AGENT_JOURNAL_AGENT=\"codex\"" in script
     assert "AGENT_JOURNAL_REAL_BIN=\"/usr/local/bin/codex\"" in script
+    assert "AGENT_JOURNAL_SESSION_ID" in script
     assert "scripts/wrappers" not in script
-    assert "agent-journal event" in script
+    assert "run_agent_journal event" in script
+    assert "guard session-end" in script
 
 
 def test_generated_wrapper_warns_when_agent_journal_is_missing(tmp_path):

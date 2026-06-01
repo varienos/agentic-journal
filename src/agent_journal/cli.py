@@ -20,6 +20,9 @@ from agent_journal.install import (
 from agent_journal.report import classify_daily_work, render_markdown_report
 from agent_journal.storage import read_events_for_date, write_event
 
+SEMANTIC_EVENT_TYPES = {"semantic_note", "task_completed_claim", "task_blocked"}
+JOURNAL_MISSING_STATUS = "journal_missing"
+
 
 def _add_event_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("event", help="Write an event")
@@ -60,6 +63,19 @@ def _add_install_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     install_sub.add_parser("mcp-snippets", help="Print MCP config snippets")
 
 
+def _add_guard_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    parser = subparsers.add_parser("guard", help="Enforce journal lifecycle expectations")
+    guard_sub = parser.add_subparsers(dest="guard_target")
+    session_end = guard_sub.add_parser("session-end", help="Write a fallback event if a session lacks semantic journal output")
+    session_end.add_argument("--agent", required=True)
+    session_end.add_argument("--session-id", required=True)
+    session_end.add_argument(
+        "--note",
+        default="Session ended without semantic journal entry",
+        help="Fallback note written when no semantic event exists for the session",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="agent-journal")
     subparsers = parser.add_subparsers(dest="command")
@@ -67,6 +83,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_report_parser(subparsers)
     _add_status_parser(subparsers)
     _add_install_parser(subparsers)
+    _add_guard_parser(subparsers)
     return parser
 
 
@@ -153,6 +170,7 @@ def _handle_status(args: argparse.Namespace) -> int:
     print(f"Completed claimed: {len(classified['completed_claimed'])}")
     print(f"In progress: {len(classified['in_progress'])}")
     print(f"Blocked: {len(classified['blocked'])}")
+    print(f"Notes: {len(classified['notes'])}")
     print(f"Risky: {len(classified['risky'])}")
     return 0
 
@@ -180,6 +198,70 @@ def _handle_install(args: argparse.Namespace) -> int:
     return 2
 
 
+def _event_matches_session(event: dict, session_id: str, agent: str) -> bool:
+    if event.get("session_id") != session_id:
+        return False
+    return not event.get("agent") or event.get("agent") == agent
+
+
+def _has_semantic_session_entry(events: list[dict], session_id: str, agent: str) -> bool:
+    return any(
+        _event_matches_session(event, session_id, agent)
+        and (
+            event.get("event_type") in SEMANTIC_EVENT_TYPES
+            or (event.get("semantic") or {}).get("status") == "blocked"
+        )
+        for event in events
+    )
+
+
+def _has_guard_fallback(events: list[dict], session_id: str, agent: str) -> bool:
+    return any(
+        _event_matches_session(event, session_id, agent)
+        and event.get("event_type") == "verification"
+        and (event.get("semantic") or {}).get("status") == JOURNAL_MISSING_STATUS
+        for event in events
+    )
+
+
+def _guard_fallback_event(args: argparse.Namespace) -> dict:
+    cwd = Path.cwd()
+    git_context = get_git_context(cwd)
+    return normalize_event(
+        {
+            "event_type": "verification",
+            "agent": args.agent,
+            "session_id": args.session_id,
+            "cwd": str(cwd),
+            "repo": git_context.get("repo"),
+            "branch": git_context.get("branch"),
+            "commit": git_context.get("commit"),
+            "semantic": {"status": JOURNAL_MISSING_STATUS, "note": args.note},
+            "evidence": {
+                "verification": "agent-journal guard session-end",
+                "verification_status": "failed",
+            },
+        }
+    )
+
+
+def _handle_guard(args: argparse.Namespace) -> int:
+    if args.guard_target == "session-end":
+        root = journal_root()
+        events = read_events_for_date(root, None)
+        if _has_semantic_session_entry(events, args.session_id, args.agent):
+            print("semantic journal entry exists")
+            return 0
+        if _has_guard_fallback(events, args.session_id, args.agent):
+            print("guard already recorded missing semantic journal entry")
+            return 0
+        write_event(root, _guard_fallback_event(args))
+        print("guarded: missing semantic journal entry")
+        return 0
+    print("Choose a guard target: session-end", file=sys.stderr)
+    return 2
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     try:
@@ -194,6 +276,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_status(args)
     if args.command == "install":
         return _handle_install(args)
+    if args.command == "guard":
+        return _handle_guard(args)
     parser.print_help()
     return 0
 

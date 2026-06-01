@@ -17,6 +17,8 @@ python3 -m venv "$VENV"
 "$PYTHON" -m pip install --no-cache-dir "$TMP_ROOT"/dist/*.whl >/dev/null
 
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" --help >/dev/null
+AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type agent_start --agent codex --session-id PACKAGE-MISSING >/dev/null
+AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" guard session-end --agent codex --session-id PACKAGE-MISSING >/dev/null
 test -x "$VENV/bin/agent-journal-mcp"
 
 "$PYTHON" - <<'PY'
@@ -70,8 +72,15 @@ import json
 paths = glob.glob("$JOURNAL_HOME/events/*.jsonl")
 assert paths, "packaged wrapper did not write JSONL events"
 events = [json.loads(line) for line in Path(paths[0]).read_text().splitlines()]
-assert [event["event_type"] for event in events] == ["agent_start", "agent_end"]
-assert events[-1]["exit_code"] == 7
+wrapper_events = [event for event in events if event.get("command") == "codex"]
+assert [event["event_type"] for event in wrapper_events] == ["agent_start", "agent_end"]
+assert wrapper_events[-1]["exit_code"] == 7
+assert any(
+    event["event_type"] == "verification"
+    and event.get("agent") == "codex"
+    and (event.get("semantic") or {}).get("status") == "journal_missing"
+    for event in events
+)
 PY
 
 set +e

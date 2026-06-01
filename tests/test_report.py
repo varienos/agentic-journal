@@ -152,10 +152,26 @@ def test_failed_agent_end_is_risky():
     assert items["risky"]
 
 
+def test_semantic_notes_are_reported_as_notes():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "semantic_note",
+                "agent": "claude",
+                "repo": "/repo",
+                "semantic": {"note": "Claude MCP bağlantısı test edildi"},
+            }
+        ]
+    )
+
+    assert items["notes"] == ["Claude MCP bağlantısı test edildi - agent=claude - repo=/repo"]
+
+
 def test_render_markdown_report_includes_required_sections():
     markdown = render_markdown_report("2026-05-31", classify_daily_work([]), raw_event_count=0)
 
     assert "# 2026-05-31 Agent Journal" in markdown
     assert "Completed Verified" in markdown
+    assert "Notes" in markdown
     assert "Risky / Needs Review" in markdown
     assert "Raw Event Count" in markdown

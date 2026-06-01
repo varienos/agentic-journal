@@ -85,6 +85,51 @@ def test_status_command_prints_today_summary(tmp_path, monkeypatch, capsys):
     assert "Raw events:" in capsys.readouterr().out
 
 
+def test_guard_session_end_writes_risky_fallback_when_semantic_entry_is_missing(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-1"])
+    main(["event", "--type", "agent_end", "--agent", "claude", "--session-id", "session-1"])
+
+    exit_code = main(["guard", "session-end", "--agent", "claude", "--session-id", "session-1"])
+    second_exit_code = main(["guard", "session-end", "--agent", "claude", "--session-id", "session-1"])
+
+    assert exit_code == 0
+    assert second_exit_code == 0
+    assert "guarded" in capsys.readouterr().out
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    events = [json.loads(line) for line in event_file.read_text().splitlines()]
+    guard_events = [event for event in events if event["event_type"] == "verification"]
+    assert len(guard_events) == 1
+    assert guard_events[0]["evidence"]["verification_status"] == "failed"
+    assert guard_events[0]["semantic"]["status"] == "journal_missing"
+
+
+def test_guard_session_end_skips_when_semantic_entry_exists(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-2"])
+    main(
+        [
+            "event",
+            "--type",
+            "task_completed_claim",
+            "--agent",
+            "claude",
+            "--session-id",
+            "session-2",
+            "--task",
+            "TASK-5",
+        ]
+    )
+
+    exit_code = main(["guard", "session-end", "--agent", "claude", "--session-id", "session-2"])
+
+    assert exit_code == 0
+    assert "semantic journal entry exists" in capsys.readouterr().out
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    events = [json.loads(line) for line in event_file.read_text().splitlines()]
+    assert [event["event_type"] for event in events] == ["agent_start", "task_completed_claim"]
+
+
 def test_wrapper_preserves_exit_code_and_logs_events(tmp_path):
     fake_bin = tmp_path / "fake-agent"
     fake_bin.write_text("#!/usr/bin/env sh\nexit 7\n")
@@ -110,7 +155,7 @@ def test_wrapper_preserves_exit_code_and_logs_events(tmp_path):
     assert result.returncode == 7
     event_file = next((tmp_path / "journal" / "events").glob("*.jsonl"))
     event_types = [json.loads(line)["event_type"] for line in event_file.read_text().splitlines()]
-    assert event_types == ["agent_start", "agent_end"]
+    assert event_types == ["agent_start", "agent_end", "verification"]
 
 
 def test_git_commit_event_records_head_commit_and_committed_files(tmp_path, monkeypatch):

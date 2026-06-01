@@ -10,5 +10,6 @@ def test_verify_script_declares_ci_smoke_checks():
     assert "python -m compileall -q src" in text
     assert "AGENT_JOURNAL_HOME" in text
     assert "agent-journal report" in text
+    assert "guard session-end" in text
     assert "install_wrappers" in text
     assert "create_mcp_server" in text

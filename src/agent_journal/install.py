@@ -12,16 +12,22 @@ export AGENT_JOURNAL_AGENT
 export AGENT_JOURNAL_REAL_BIN
 AGENT="$AGENT_JOURNAL_AGENT"
 SESSION_ID="$(date +%s)-$$"
+AGENT_JOURNAL_SESSION_ID="$SESSION_ID"
+export AGENT_JOURNAL_SESSION_ID
 START_TS="$(date +%s)"
 AGENT_JOURNAL_WARNED=0
 
-journal_event() {{
+run_agent_journal() {{
   if command -v agent-journal >/dev/null 2>&1; then
-    agent-journal event "$@" >/dev/null 2>&1 || true
+    agent-journal "$@" >/dev/null 2>&1 || true
   elif [ "$AGENT_JOURNAL_WARNED" -eq 0 ]; then
-    echo "agent-journal command not found; skipping journal event. Add the package bin directory to PATH." >&2
+    echo "agent-journal command not found; skipping journal command. Add the package bin directory to PATH." >&2
     AGENT_JOURNAL_WARNED=1
   fi
+}}
+
+journal_event() {{
+  run_agent_journal event "$@"
 }}
 
 journal_event --type agent_start --agent "$AGENT" --session-id "$SESSION_ID" --command "$AGENT"
@@ -30,6 +36,7 @@ STATUS=$?
 END_TS="$(date +%s)"
 DURATION_MS=$(( (END_TS - START_TS) * 1000 ))
 journal_event --type agent_end --agent "$AGENT" --session-id "$SESSION_ID" --command "$AGENT" --exit-code "$STATUS" --duration-ms "$DURATION_MS"
+run_agent_journal guard session-end --agent "$AGENT" --session-id "$SESSION_ID"
 exit "$STATUS"
 """
 

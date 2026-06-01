@@ -9,6 +9,7 @@ def test_package_smoke_script_declares_packaged_entrypoint_checks():
     assert "uv build" in text
     assert "agent-journal\" --help" in text
     assert "agent-journal-mcp" in text
+    assert "guard session-end" in text
     assert "install wrappers" in text
     assert "install git-hook" in text
     assert "AGENT_JOURNAL_HOME" in text

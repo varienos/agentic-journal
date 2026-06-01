@@ -45,6 +45,9 @@ Correlation rules:
   `completed_claimed` and commit work remains `in_progress`.
 - Failed verification events are reported as risky and do not verify matching
   tasks or commits.
+- `agent-journal guard session-end` writes a failed `verification` event with
+  `semantic.status = "journal_missing"` when a session ends without a
+  `semantic_note`, `task_completed_claim`, or `task_blocked` event.
 
 Privacy rules:
 

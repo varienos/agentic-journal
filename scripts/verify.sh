@@ -13,8 +13,12 @@ cd "$ROOT"
 uv run pytest -q
 uv run python -m compileall -q src
 
-uv run agent-journal event --type agent_start --agent codex --task VERIFY-SMOKE --note "verify smoke"
-uv run agent-journal event --type task_completed_claim --agent codex --task VERIFY-SMOKE --note "verify smoke completed"
+uv run agent-journal event --type agent_start --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --note "verify smoke"
+uv run agent-journal event --type task_completed_claim --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --note "verify smoke completed"
+uv run agent-journal guard session-end --agent codex --session-id VERIFY-SESSION >/dev/null
+uv run agent-journal event --type agent_start --agent claude --session-id VERIFY-MISSING --note "missing semantic smoke"
+uv run agent-journal guard session-end --agent claude --session-id VERIFY-MISSING >/dev/null
+uv run agent-journal guard session-end --agent claude --session-id VERIFY-MISSING >/dev/null
 uv run agent-journal report --today --print >/dev/null
 uv run agent-journal status --today >/dev/null
 
@@ -44,8 +48,9 @@ import json
 paths = glob.glob("$TMP_ROOT/wrapper-journal/events/*.jsonl")
 assert paths, "wrapper smoke did not write JSONL events"
 events = [json.loads(line) for line in Path(paths[0]).read_text().splitlines()]
-assert [event["event_type"] for event in events] == ["agent_start", "agent_end"]
-assert events[-1]["exit_code"] == 7
+assert [event["event_type"] for event in events] == ["agent_start", "agent_end", "verification"]
+assert events[1]["exit_code"] == 7
+assert events[-1]["semantic"]["status"] == "journal_missing"
 PY
 
 mkdir -p "$TMP_ROOT/repo"
