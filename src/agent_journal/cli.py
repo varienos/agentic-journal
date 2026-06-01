@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Sequence
 
 from agent_journal.config import journal_root
+from agent_journal.diagnostics import build_doctor_report, build_doctor_result
 from agent_journal.events import normalize_event
 from agent_journal.git_context import get_git_context, get_head_commit_files
 from agent_journal.install import (
@@ -19,7 +20,7 @@ from agent_journal.install import (
     install_shell_profile,
     install_wrappers,
 )
-from agent_journal.report import classify_daily_work, render_markdown_report
+from agent_journal.report import build_provider_coverage, classify_daily_work, render_markdown_report
 from agent_journal.storage import read_events_for_date, write_event
 from agent_journal.web import run_web_server
 
@@ -58,6 +59,12 @@ def _add_report_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
 def _add_status_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("status", help="Print a compact daily status")
+    parser.add_argument("--today", action="store_true")
+    parser.add_argument("--date")
+
+
+def _add_doctor_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    parser = subparsers.add_parser("doctor", help="Audit Agent Journal setup and daily coverage")
     parser.add_argument("--today", action="store_true")
     parser.add_argument("--date")
 
@@ -102,6 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_event_parser(subparsers)
     _add_report_parser(subparsers)
     _add_status_parser(subparsers)
+    _add_doctor_parser(subparsers)
     _add_web_parser(subparsers)
     _add_install_parser(subparsers)
     _add_guard_parser(subparsers)
@@ -174,7 +182,12 @@ def _report_date(args: argparse.Namespace) -> str:
 def _handle_report(args: argparse.Namespace) -> int:
     date = _report_date(args)
     events = read_events_for_date(journal_root(), date)
-    markdown = render_markdown_report(date, classify_daily_work(events), raw_event_count=len(events))
+    markdown = render_markdown_report(
+        date,
+        classify_daily_work(events),
+        raw_event_count=len(events),
+        provider_coverage=build_provider_coverage(events),
+    )
     output = Path(args.output).expanduser() if args.output else journal_root() / "reports" / f"{date}.md"
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(markdown, encoding="utf-8")
@@ -198,6 +211,19 @@ def _handle_status(args: argparse.Namespace) -> int:
     print(f"Blocked: {len(classified['blocked'])}")
     print(f"Notes: {len(classified['notes'])}")
     print(f"Risky: {len(classified['risky'])}")
+    for agent, stats in build_provider_coverage(events).items():
+        print(
+            f"{agent}: {stats['sessions']} sessions, {stats['summarized']} summarized, "
+            f"{stats['missing']} missing, {stats['in_progress']} in progress, "
+            f"{stats['coverage_percent']}% coverage"
+        )
+    return 0
+
+
+def _handle_doctor(args: argparse.Namespace) -> int:
+    date = _report_date(args)
+    result = build_doctor_result(journal_root(), date)
+    print(build_doctor_report(result), end="")
     return 0
 
 
@@ -282,6 +308,7 @@ def _guard_fallback_event(args: argparse.Namespace) -> dict:
             "repo": git_context.get("repo"),
             "branch": git_context.get("branch"),
             "commit": git_context.get("commit"),
+            "files_changed": git_context.get("changed_files") or [],
             "semantic": {"status": JOURNAL_MISSING_STATUS, "note": args.note},
             "evidence": {
                 "verification": "agent-journal guard session-end",
@@ -320,6 +347,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_report(args)
     if args.command == "status":
         return _handle_status(args)
+    if args.command == "doctor":
+        return _handle_doctor(args)
     if args.command == "web":
         return _handle_web(args)
     if args.command == "install":

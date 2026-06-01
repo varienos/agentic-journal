@@ -34,8 +34,10 @@ The project is intentionally local-first. Runtime data is stored under
 - Agent wrappers for `codex`, `claude`, and `gemini`
 - Session-end guard for missing semantic journal entries
 - Required session summary events for useful end-of-day reports
+- `doctor` setup audit for wrappers, MCP config hints, instructions, hooks, and daily coverage
+- Provider-level coverage scores for Codex, Claude, and Gemini sessions
 - Git post-commit hook installer
-- Daily Markdown report generation
+- Daily Markdown report generation with verified, claimed, observed, and risky evidence levels
 - Live web dashboard with auto-refreshing event data and optional API token
 - JSONL and SQLite event storage
 
@@ -123,6 +125,12 @@ Generate today's report:
 
 ```bash
 agent-journal report --today --print
+```
+
+Audit setup and provider coverage:
+
+```bash
+agent-journal doctor --today
 ```
 
 Run the live dashboard:
@@ -234,6 +242,7 @@ scripts/package-smoke.sh
 ```
 
 Operational details live in [docs/operations.md](docs/operations.md).
+Native hook examples live in [docs/native-hooks.md](docs/native-hooks.md).
 The improvement roadmap lives in
 [docs/improvement-plan.md](docs/improvement-plan.md).
 

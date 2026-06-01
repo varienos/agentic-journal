@@ -60,6 +60,8 @@ def test_build_events_payload_returns_summary_and_latest_events(tmp_path):
     assert payload["summary"]["in_progress"] == 0
     assert payload["summary"]["notes"] == 1
     assert payload["summary"]["risky"] == 1
+    assert payload["provider_coverage"]["codex"]["coverage_percent"] == 100
+    assert payload["provider_coverage"]["claude"]["missing"] == 1
     assert payload["latest_events"][0]["event_type"] == "verification"
     assert payload["latest_events"][1]["event_type"] == "session_summary"
     session = next(item for item in payload["sessions"] if item["session_id"] == "summary-1")
@@ -75,7 +77,8 @@ def test_build_events_payload_marks_started_session_missing_summary(tmp_path):
     payload = build_events_payload(tmp_path, "2026-06-01")
 
     assert payload["sessions"][0]["session_id"] == "missing-1"
-    assert payload["sessions"][0]["summary"] == "Summary missing"
+    assert payload["sessions"][0]["summary"] == "Missing semantic summary"
+    assert "Wrapper captured start/end" in payload["sessions"][0]["diagnosis"]
     assert payload["sessions"][0]["missing_summary"] is True
 
 
@@ -87,6 +90,8 @@ def test_render_dashboard_html_contains_live_dashboard_controls():
     assert "X-Agent-Journal-Token" in html
     assert "setInterval" in html
     assert "Session Summaries" in html
+    assert "Provider Coverage" in html
+    assert "Likely cause" in html
     assert "data-section=\"sessions\"" in html
     assert "data-section=\"notes\"" in html
     assert "data-section=\"risky\"" in html

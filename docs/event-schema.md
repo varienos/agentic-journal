@@ -63,6 +63,9 @@ Correlation rules:
   `semantic.status = "journal_missing"` when a session ends without a
   `session_summary`, `task_completed_claim`, or `task_blocked` event. Generic
   `semantic_note` entries do not satisfy the session outcome requirement.
+- Guard fallback events include `files_changed` from git status when available.
+  This gives objective context for missing summaries without storing prompt
+  transcripts or inventing completed work.
 - Duplicate `event_id` writes are ignored so SQLite and the daily JSONL mirror
   remain aligned.
 

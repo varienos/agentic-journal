@@ -117,6 +117,34 @@ def test_status_command_prints_today_summary(tmp_path, monkeypatch, capsys):
     assert "Raw events:" in capsys.readouterr().out
 
 
+def test_doctor_command_prints_setup_and_coverage(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    main(["event", "--type", "agent_start", "--agent", "codex", "--session-id", "doctor-1"])
+    main(
+        [
+            "event",
+            "--type",
+            "session_summary",
+            "--agent",
+            "codex",
+            "--session-id",
+            "doctor-1",
+            "--summary",
+            "Doctor smoke",
+            "--outcome",
+            "completed",
+        ]
+    )
+
+    exit_code = main(["doctor", "--date", "2026-05-31"])
+
+    assert exit_code == 0
+    output = capsys.readouterr().out
+    assert "Agent Journal Doctor" in output
+    assert "Session summaries:" in output
+    assert "codex:" in output
+
+
 def test_web_help_exits_cleanly(capsys):
     exit_code = main(["web", "--help"])
 
@@ -185,6 +213,30 @@ def test_guard_session_end_requires_session_outcome_not_generic_note(tmp_path, m
     event_file = next((tmp_path / "events").glob("*.jsonl"))
     events = [json.loads(line) for line in event_file.read_text().splitlines()]
     assert [event["event_type"] for event in events] == ["agent_start", "semantic_note", "verification"]
+
+
+def test_guard_session_end_records_changed_files_as_objective_fallback_context(tmp_path, monkeypatch):
+    journal = tmp_path / "journal"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True)
+    (repo / "tracked.txt").write_text("before\n", encoding="utf-8")
+    subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "add tracked"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+    (repo / "tracked.txt").write_text("after\n", encoding="utf-8")
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(journal))
+    monkeypatch.chdir(repo)
+    main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-files"])
+
+    exit_code = main(["guard", "session-end", "--agent", "claude", "--session-id", "session-files"])
+
+    assert exit_code == 0
+    event_file = next((journal / "events").glob("*.jsonl"))
+    events = [json.loads(line) for line in event_file.read_text().splitlines()]
+    fallback = [event for event in events if event["event_type"] == "verification"][-1]
+    assert fallback["files_changed"] == ["tracked.txt"]
 
 
 def test_guard_session_end_skips_when_session_summary_exists(tmp_path, monkeypatch, capsys):

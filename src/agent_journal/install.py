@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from agent_journal.git_hooks import resolve_git_hook_path
+
 
 SHELL_PROFILE_BEGIN = "# >>> agent-journal wrappers >>>"
 SHELL_PROFILE_END = "# <<< agent-journal wrappers <<<"
@@ -184,10 +186,9 @@ def install_agent_instructions(
 
 
 def install_git_hook(repo: str | Path) -> Path:
-    repo_path = Path(repo).expanduser()
-    hooks_dir = repo_path / ".git" / "hooks"
+    target = resolve_git_hook_path(repo)
+    hooks_dir = target.parent
     hooks_dir.mkdir(parents=True, exist_ok=True)
-    target = hooks_dir / "post-commit"
     if target.exists():
         backup = hooks_dir / "post-commit.agent-journal.bak"
         if not backup.exists():

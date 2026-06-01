@@ -156,6 +156,24 @@ def test_install_git_hook_does_not_depend_on_source_tree(tmp_path, monkeypatch):
     assert "agent-journal event --type git_commit" in installed.read_text()
 
 
+def test_install_git_hook_uses_common_git_hooks_dir_for_worktree(tmp_path):
+    repo = tmp_path / "repo"
+    worktree = tmp_path / "worktree"
+    repo.mkdir()
+    subprocess.run(["git", "init"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test User"], cwd=repo, check=True)
+    (repo / "README.md").write_text("hello\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["git", "worktree", "add", str(worktree)], cwd=repo, check=True, stdout=subprocess.DEVNULL)
+
+    installed = install_git_hook(worktree)
+
+    assert installed == repo / ".git" / "hooks" / "post-commit"
+    assert "agent-journal event --type git_commit" in installed.read_text()
+
+
 def test_codex_mcp_snippet_mentions_agent_journal_mcp():
     snippet = codex_mcp_snippet("/repo")
 

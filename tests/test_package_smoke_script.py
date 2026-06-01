@@ -9,6 +9,7 @@ def test_package_smoke_script_declares_packaged_entrypoint_checks():
     assert "uv build" in text
     assert "agent-journal\" --help" in text
     assert "agent-journal\" web --help" in text
+    assert "agent-journal\" doctor" in text
     assert "session_summary" in text
     assert "journal_session_summary" in text
     assert "journal_task_completed" in text

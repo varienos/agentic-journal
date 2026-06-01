@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from agent_journal.report import classify_daily_work
+from agent_journal.report import build_provider_coverage, classify_daily_work
 from agent_journal.storage import read_events_for_date
 
 CLASSIFIED_KEYS = (
@@ -91,6 +91,7 @@ def build_session_views(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "commit": event.get("commit"),
                 "event_types": [],
                 "summary": None,
+                "diagnosis": None,
                 "outcome": None,
                 "missing_summary": True,
             },
@@ -106,7 +107,12 @@ def build_session_views(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             session["missing_summary"] = False
     for session in sessions.values():
         if session["missing_summary"]:
-            session["summary"] = "Summary missing"
+            session["summary"] = "Missing semantic summary"
+            session["diagnosis"] = (
+                "Wrapper captured start/end or session activity, but no "
+                "journal_session_summary was written. Likely cause: model did "
+                "not call the MCP tool or the Agent Journal instruction was not loaded."
+            )
             session["outcome"] = "unknown"
         if session.get("commit"):
             session["commit"] = str(session["commit"])[:12]
@@ -122,6 +128,7 @@ def build_events_payload(root: str | Path | None, report_date: str, limit: int =
         "raw_event_count": len(events),
         "summary": {key: len(classified.get(key, [])) for key in CLASSIFIED_KEYS},
         "classified": {key: classified.get(key, []) for key in CLASSIFIED_KEYS},
+        "provider_coverage": build_provider_coverage(events),
         "sessions": build_session_views(events),
         "latest_events": latest,
     }
@@ -270,6 +277,10 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
       display: grid;
       gap: 0;
     }}
+    .coverage-list {{
+      display: grid;
+      gap: 0;
+    }}
     .event, .session-row {{
       display: grid;
       grid-template-columns: 170px 120px minmax(0, 1fr);
@@ -295,6 +306,12 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
       font-size: 13px;
       line-height: 1.45;
       overflow-wrap: anywhere;
+    }}
+    .diagnosis {{
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+      margin-top: 4px;
     }}
     .side {{
       display: grid;
@@ -355,6 +372,10 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
           <div id="sessions" class="session-list" data-section="sessions"></div>
         </section>
         <section>
+          <h2>Provider Coverage</h2>
+          <div id="coverage" class="coverage-list"></div>
+        </section>
+        <section>
           <h2>Latest Events</h2>
           <div id="events" class="event-list"></div>
         </section>
@@ -378,6 +399,8 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
     const dateEl = document.getElementById("date");
     const eventsEl = document.getElementById("events");
     const sessionsEl = document.getElementById("sessions");
+    const coverageEl = document.getElementById("coverage");
+    const missingSummaryFallbackDiagnosis = "Likely cause: model did not call the MCP tool or the Agent Journal instruction was not loaded.";
 
     function text(value) {{
       return value === null || value === undefined || value === "" ? "-" : String(value);
@@ -427,6 +450,24 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
       }});
     }}
 
+    function renderCoverage(coverage) {{
+      coverageEl.innerHTML = "";
+      const entries = Object.entries(coverage || {{}});
+      if (entries.length === 0) {{
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No provider coverage";
+        coverageEl.appendChild(empty);
+        return;
+      }}
+      entries.forEach(([agent, stats]) => {{
+        const row = document.createElement("div");
+        row.className = "bucket-item";
+        row.textContent = `${{agent}}: ${{stats.sessions}} sessions, ${{stats.summarized}} summarized, ${{stats.missing}} missing, ${{stats.in_progress}} in progress, ${{stats.coverage_percent}}% coverage`;
+        coverageEl.appendChild(row);
+      }});
+    }}
+
     function renderSessions(sessions) {{
       sessionsEl.innerHTML = "";
       if (!sessions || sessions.length === 0) {{
@@ -449,6 +490,12 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
         label.className = "label";
         const repo = session.repo ? ` · ${{session.repo}}` : "";
         label.textContent = `${{text(session.summary)}}${{repo}}`;
+        if (session.missing_summary) {{
+          const diagnosis = document.createElement("div");
+          diagnosis.className = "diagnosis";
+          diagnosis.textContent = session.diagnosis || missingSummaryFallbackDiagnosis;
+          label.appendChild(diagnosis);
+        }}
         row.append(time, kind, label);
         sessionsEl.appendChild(row);
       }});
@@ -468,6 +515,7 @@ def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 20
         document.getElementById(`m-${{key}}`).textContent = payload.summary[key] || 0;
       }});
       renderSessions(payload.sessions);
+      renderCoverage(payload.provider_coverage);
       renderEvents(payload.latest_events);
       renderBucket("notes", payload.classified.notes);
       renderBucket("risky", payload.classified.risky);

@@ -18,6 +18,7 @@ python3 -m venv "$VENV"
 
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" --help >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" web --help >/dev/null
+AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" doctor --date "$(date +%F)" >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type agent_start --agent codex --session-id PACKAGE-MISSING >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" guard session-end --agent codex --session-id PACKAGE-MISSING >/dev/null
 AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type agent_start --agent codex --session-id PACKAGE-SUMMARY >/dev/null

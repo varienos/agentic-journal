@@ -54,6 +54,16 @@ MCP server can be created from the packaged environment.
 The smoke suite also checks MCP session context propagation, JSON API token
 enforcement, wrapper guard fallback behavior, and packaged dashboard rendering.
 
+Use the doctor command when setup behavior is unclear:
+
+```bash
+agent-journal doctor --today
+```
+
+It reports wrapper PATH status, MCP configuration hints, global instruction
+presence, daily session summary coverage, `journal_missing` counts, git hook
+status, and dashboard/API token mode.
+
 ## Local And Global Install
 
 Run from the source checkout without installing:
@@ -131,8 +141,10 @@ agent-journal guard session-end --agent claude --session-id "$AGENT_JOURNAL_SESS
 If the session already has a `session_summary`, `task_completed_claim`, or
 `task_blocked` event, the guard is a no-op. If not, it writes one failed
 verification event with `semantic.status = "journal_missing"`, which appears in
-the Risky / Needs Review section of the daily report. Running the guard multiple
-times for the same session is idempotent.
+the Risky / Needs Review section of the daily report. The fallback event also
+includes the current git `files_changed` list when available, giving objective
+context without capturing transcripts or inventing summaries. Running the guard
+multiple times for the same session is idempotent.
 
 Generated wrappers export `AGENT_JOURNAL_SESSION_ID` and call the guard after
 `agent_end`, so wrapped Codex, Claude, and Gemini sessions are automatically
@@ -142,6 +154,11 @@ For native agent hook systems, wire the same command into the stop/session-end
 hook and pass the agent name used by that runtime. Keep MCP instructions in
 place so models can still write richer semantic entries during or before final
 responses.
+
+See [native-hooks.md](native-hooks.md) for Claude SessionEnd, Gemini hook, and
+Codex automation examples. Hooks should never invent completed work; they should
+write a real `session_summary` only when a real outcome is available, otherwise
+they should let the guard record `journal_missing`.
 
 ## Wrapper Setup
 
