@@ -25,3 +25,4 @@ def test_package_smoke_script_declares_packaged_entrypoint_checks():
     assert "install git-hook" in text
     assert "AGENT_JOURNAL_HOME" in text
     assert "scripts/wrappers" in text
+    assert "scripts/release-check.sh" in text

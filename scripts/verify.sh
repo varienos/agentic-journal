@@ -10,6 +10,7 @@ export PATH="$ROOT/.venv/bin:$PATH"
 
 cd "$ROOT"
 
+scripts/release-check.sh
 uv run pytest -q
 uv run python -m compileall -q src
 

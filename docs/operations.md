@@ -236,12 +236,30 @@ Before tagging or sharing a build:
 ```bash
 uv lock --check
 uv run pytest -q
+scripts/release-check.sh
 scripts/verify.sh
 scripts/package-smoke.sh
 ```
 
-Confirm `pyproject.toml` has the intended version and console scripts, and that
-`uv.lock` is committed with dependency changes.
+Confirm `pyproject.toml`, `src/agent_journal/__init__.py`, and
+`CHANGELOG.md` all describe the same version. `scripts/release-check.sh`
+enforces that version sync and verifies the changelog has both `[Unreleased]`
+and a dated section for the current version.
+
+For a GitHub release:
+
+```bash
+VERSION=0.1.0
+scripts/release-check.sh --tag "v$VERSION"
+git tag "v$VERSION"
+git push origin "v$VERSION"
+```
+
+The `Release` GitHub Actions workflow runs on `v*.*.*` tags. It validates
+release metadata, runs tests plus smoke checks, builds wheel and source
+distributions, extracts release notes from `CHANGELOG.md`, and publishes the
+release with `gh release create --verify-tag`. Use `gh release view "v$VERSION"`
+after the workflow completes to confirm the GitHub release exists.
 
 ## Daily Report
 

@@ -10,8 +10,6 @@ It records verifiable events from Codex, Claude Code, Gemini CLI, git commits,
 and semantic MCP notes, then produces daily Markdown reports and a live local
 dashboard.
 
-Repository: [varienos/agent-journal](https://github.com/varienos/agent-journal)
-
 ## Why
 
 Multiple agents can work on the same machine during the day. Agent Journal gives
@@ -39,6 +37,7 @@ The project is intentionally local-first. Runtime data is stored under
 - Git post-commit hook installer
 - Daily Markdown report generation with verified, claimed, observed, and risky evidence levels
 - Live web dashboard with auto-refreshing event data and optional API token
+- `CHANGELOG.md` plus tag-driven GitHub release automation
 - JSONL and SQLite event storage
 
 ## Install
@@ -240,6 +239,19 @@ Run stabilization smoke checks:
 scripts/verify.sh
 scripts/package-smoke.sh
 ```
+
+## Release
+
+Releases use `CHANGELOG.md`, the project version in `pyproject.toml`, and
+`vMAJOR.MINOR.PATCH` Git tags. Before tagging, run:
+
+```bash
+scripts/release-check.sh
+```
+
+Pushing a matching version tag starts the GitHub Release workflow, builds wheel
+and source distributions, extracts notes from `CHANGELOG.md`, and publishes the
+GitHub release.
 
 Operational details live in [docs/operations.md](docs/operations.md).
 Native hook examples live in [docs/native-hooks.md](docs/native-hooks.md).

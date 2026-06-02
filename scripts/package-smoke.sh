@@ -11,6 +11,7 @@ JOURNAL_HOME="$TMP_ROOT/journal"
 
 cd "$ROOT"
 
+scripts/release-check.sh
 uv build --wheel --out-dir "$TMP_ROOT/dist" >/dev/null
 python3 -m venv "$VENV"
 "$PYTHON" -m pip install --no-cache-dir --upgrade pip >/dev/null

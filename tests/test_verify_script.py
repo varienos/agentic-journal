@@ -18,3 +18,4 @@ def test_verify_script_declares_ci_smoke_checks():
     assert "guard session-end" in text
     assert "install_wrappers" in text
     assert "create_mcp_server" in text
+    assert "scripts/release-check.sh" in text
