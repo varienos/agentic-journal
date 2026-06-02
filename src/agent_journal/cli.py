@@ -232,7 +232,7 @@ def _handle_web(args: argparse.Namespace) -> int:
         journal_root(),
         args.host,
         args.port,
-        _report_date(args),
+        args.date,
         refresh_ms=args.refresh_ms,
         api_token=args.token,
     )

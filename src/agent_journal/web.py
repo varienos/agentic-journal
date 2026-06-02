@@ -24,6 +24,16 @@ CLASSIFIED_KEYS = (
 )
 
 
+def _today_iso() -> str:
+    return date.today().isoformat()
+
+
+def _selected_date(default_date: date | str | None) -> str:
+    if isinstance(default_date, date):
+        return default_date.isoformat()
+    return default_date or _today_iso()
+
+
 def _event_label(event: dict[str, Any]) -> str:
     semantic = event.get("semantic") or {}
     bits = []
@@ -134,8 +144,8 @@ def build_events_payload(root: str | Path | None, report_date: str, limit: int =
     }
 
 
-def render_dashboard_html(default_date: date | None = None, refresh_ms: int = 2000) -> str:
-    selected_date = (default_date or date.today()).isoformat()
+def render_dashboard_html(default_date: date | str | None = None, refresh_ms: int = 2000) -> str:
+    selected_date = _selected_date(default_date)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -550,10 +560,13 @@ def _is_authorized(handler: BaseHTTPRequestHandler, params: dict[str, list[str]]
 
 def create_web_handler(
     root: str | Path | None,
-    default_date: str,
+    default_date: str | None,
     refresh_ms: int = 2000,
     api_token: str | None = None,
 ):
+    def current_default_date() -> str:
+        return default_date or _today_iso()
+
     class AgentJournalHandler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:
             return
@@ -561,7 +574,7 @@ def create_web_handler(
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
             if parsed.path in ("/", "/index.html"):
-                html = render_dashboard_html(date.fromisoformat(default_date), refresh_ms=refresh_ms)
+                html = render_dashboard_html(current_default_date(), refresh_ms=refresh_ms)
                 _write_response(self, HTTPStatus.OK, html.encode("utf-8"), "text/html; charset=utf-8")
                 return
             if parsed.path == "/api/events":
@@ -574,7 +587,8 @@ def create_web_handler(
                         "application/json; charset=utf-8",
                     )
                     return
-                report_date = params.get("date", [default_date])[0] or default_date
+                fallback_date = current_default_date()
+                report_date = params.get("date", [fallback_date])[0] or fallback_date
                 payload = build_events_payload(root, report_date)
                 body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                 _write_response(self, HTTPStatus.OK, body, "application/json; charset=utf-8")

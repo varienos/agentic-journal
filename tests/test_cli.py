@@ -156,6 +156,36 @@ def test_web_help_exits_cleanly(capsys):
     assert "--token" in output
 
 
+def test_web_command_without_explicit_date_uses_dynamic_default(monkeypatch):
+    calls = {}
+
+    def fake_run_web_server(root, host, port, default_date, refresh_ms=2000, api_token=None):
+        calls["default_date"] = default_date
+        calls["refresh_ms"] = refresh_ms
+
+    monkeypatch.setattr("agent_journal.cli.run_web_server", fake_run_web_server)
+
+    exit_code = main(["web", "--today", "--refresh-ms", "3000"])
+
+    assert exit_code == 0
+    assert calls["default_date"] is None
+    assert calls["refresh_ms"] == 3000
+
+
+def test_web_command_with_explicit_date_keeps_that_date(monkeypatch):
+    calls = {}
+
+    def fake_run_web_server(root, host, port, default_date, refresh_ms=2000, api_token=None):
+        calls["default_date"] = default_date
+
+    monkeypatch.setattr("agent_journal.cli.run_web_server", fake_run_web_server)
+
+    exit_code = main(["web", "--date", "2026-06-01"])
+
+    assert exit_code == 0
+    assert calls["default_date"] == "2026-06-01"
+
+
 def test_guard_session_end_writes_risky_fallback_when_semantic_entry_is_missing(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-1"])

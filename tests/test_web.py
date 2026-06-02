@@ -98,6 +98,60 @@ def test_render_dashboard_html_contains_live_dashboard_controls():
     assert "2026-06-01" in html
 
 
+def test_web_handler_without_explicit_date_uses_current_day_per_request(tmp_path, monkeypatch):
+    current = {"date": "2026-06-02"}
+    monkeypatch.setattr("agent_journal.web._today_iso", lambda: current["date"])
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_web_handler(tmp_path, None))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    conn = http.client.HTTPConnection(host, port, timeout=5)
+
+    try:
+        conn.request("GET", "/")
+        response = conn.getresponse()
+        html = response.read().decode("utf-8")
+        assert response.status == 200
+        assert 'value="2026-06-02"' in html
+
+        current["date"] = "2026-06-03"
+        conn.request("GET", "/api/events")
+        response = conn.getresponse()
+        payload = json.loads(response.read())
+        assert response.status == 200
+        assert payload["date"] == "2026-06-03"
+    finally:
+        conn.close()
+        server.shutdown()
+        server.server_close()
+
+
+def test_web_handler_with_explicit_date_keeps_that_date(tmp_path, monkeypatch):
+    monkeypatch.setattr("agent_journal.web._today_iso", lambda: "2026-06-02")
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_web_handler(tmp_path, "2026-06-01"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    conn = http.client.HTTPConnection(host, port, timeout=5)
+
+    try:
+        conn.request("GET", "/")
+        response = conn.getresponse()
+        html = response.read().decode("utf-8")
+        assert response.status == 200
+        assert 'value="2026-06-01"' in html
+
+        conn.request("GET", "/api/events")
+        response = conn.getresponse()
+        payload = json.loads(response.read())
+        assert response.status == 200
+        assert payload["date"] == "2026-06-01"
+    finally:
+        conn.close()
+        server.shutdown()
+        server.server_close()
+
+
 def test_api_events_requires_token_when_configured(tmp_path):
     write_event(tmp_path, _event("semantic_note", semantic={"note": "private"}))
     server = ThreadingHTTPServer(

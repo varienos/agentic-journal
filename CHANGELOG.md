@@ -7,6 +7,12 @@ and this project uses `vMAJOR.MINOR.PATCH` Git tags for GitHub releases.
 
 ## [Unreleased]
 
+### Fixed
+
+- Web dashboard now computes the default date per request unless an explicit
+  `--date` is provided, so long-running `agent-journal web --today` servers roll
+  over to the current day after midnight.
+
 ## [0.1.0] - 2026-06-02
 
 ### Added
