@@ -57,3 +57,19 @@ def get_head_commit_files(cwd: str | Path) -> list[str]:
     if not output:
         return []
     return [line.strip() for line in output.splitlines() if line.strip()]
+
+
+def event_context(cwd: str | Path, *, git: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Build the ``{cwd, repo, branch, commit}`` envelope shared by event writers.
+
+    Pass an already-fetched ``git`` context to reuse it (avoids a second git
+    invocation); otherwise it is fetched here. This is the single source for the
+    git metadata attached by both the CLI and the MCP server.
+    """
+    git_context = git if git is not None else get_git_context(cwd)
+    return {
+        "cwd": str(cwd),
+        "repo": git_context.get("repo"),
+        "branch": git_context.get("branch"),
+        "commit": git_context.get("commit"),
+    }

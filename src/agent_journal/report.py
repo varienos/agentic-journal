@@ -1,20 +1,33 @@
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
 from typing import Any
+
+from agent_journal.events import (
+    AGENT_END_EVENT_TYPE,
+    AGENT_START_EVENT_TYPE,
+    GIT_COMMIT_EVENT_TYPE,
+    JOURNAL_MISSING_STATUS,
+    SEMANTIC_NOTE_EVENT_TYPE,
+    SESSION_EVENT_TYPES,
+    SESSION_OUTCOME_EVENT_TYPES,
+    SESSION_SUMMARY_EVENT_TYPE,
+    TASK_BLOCKED_EVENT_TYPE,
+    TASK_COMPLETED_CLAIM_EVENT_TYPE,
+    VERIFICATION_EVENT_TYPE,
+)
 
 
 DEFAULT_PROVIDERS = ("codex", "claude", "gemini")
-SESSION_OUTCOME_EVENT_TYPES = {"session_summary", "task_completed_claim", "task_blocked"}
-SESSION_EVENT_TYPES = SESSION_OUTCOME_EVENT_TYPES | {"agent_start", "agent_end", "verification"}
-JOURNAL_MISSING_STATUS = "journal_missing"
 AGENT_ALIASES = {
     "claude-code": "claude",
 }
 
 
-def _label(event: dict[str, Any]) -> str:
+def event_label(event: dict[str, Any]) -> str:
     semantic = event.get("semantic") or {}
-    task_id = _task_id(event)
+    task_id = event_task_id(event)
     note = semantic.get("summary") or semantic.get("note") or semantic.get("reason")
     outcome = semantic.get("outcome")
     commit = event.get("commit")
@@ -34,7 +47,7 @@ def _label(event: dict[str, Any]) -> str:
     return " - ".join(bits)
 
 
-def _task_id(event: dict[str, Any]) -> str | None:
+def event_task_id(event: dict[str, Any]) -> str | None:
     semantic = event.get("semantic") or {}
     return semantic.get("task_id") or event.get("task_id")
 
@@ -52,11 +65,18 @@ def _matches_passed_verification(event: dict[str, Any], verification: dict[str, 
     if event.get("commit") and event.get("commit") == verification.get("commit"):
         return True
 
+    event_task = event_task_id(event)
+    verification_task = event_task_id(verification)
+    # When both sides name a task, the task ids must agree. A shared session_id
+    # is not enough: within one wrapper session many tasks run, and a passed
+    # verification for task A must never verify an unrelated claim for task B.
+    if event_task and verification_task and event_task != verification_task:
+        return False
+
     if event.get("session_id") and event.get("session_id") == verification.get("session_id"):
         return True
 
-    task_id = _task_id(event)
-    return bool(task_id and task_id == _task_id(verification))
+    return bool(event_task and event_task == verification_task)
 
 
 def _session_key(event: dict[str, Any]) -> tuple[str, str] | None:
@@ -91,7 +111,7 @@ def build_provider_coverage(events: list[dict[str, Any]], providers: tuple[str, 
             sessions[agent].add(session_id)
         if event_type in SESSION_OUTCOME_EVENT_TYPES:
             summarized[agent].add(session_id)
-        if event_type == "verification" and semantic.get("status") == JOURNAL_MISSING_STATUS:
+        if event_type == VERIFICATION_EVENT_TYPE and semantic.get("status") == JOURNAL_MISSING_STATUS:
             missing[agent].add(session_id)
 
     coverage: dict[str, dict[str, int]] = {}
@@ -132,45 +152,50 @@ def classify_daily_work(events: list[dict[str, Any]]) -> dict[str, list[str]]:
         if event_type in SESSION_OUTCOME_EVENT_TYPES and session_key:
             closed_sessions.add(session_key)
         if (
-            event_type == "verification"
+            event_type == VERIFICATION_EVENT_TYPE
             and evidence.get("verification_status") == "passed"
         ):
             passed_verifications.append(event)
             if event.get("commit"):
                 passed_verification_by_commit.add(event["commit"])
-        if event_type == "verification" and evidence.get("verification_status") == "failed" and session_key:
+        if event_type == VERIFICATION_EVENT_TYPE and evidence.get("verification_status") == "failed" and session_key:
             closed_sessions.add(session_key)
-        if event_type == "git_commit":
+        # A session that errored out (non-zero exit) is already surfaced as Risky
+        # via its agent_end; close it so the matching agent_start is not also
+        # double-counted under Observed / In Progress.
+        if event_type == AGENT_END_EVENT_TYPE and event.get("exit_code") not in (None, 0) and session_key:
+            closed_sessions.add(session_key)
+        if event_type == GIT_COMMIT_EVENT_TYPE:
             commits.append(event)
 
     for event in commits:
         if event.get("commit") and event.get("commit") in passed_verification_by_commit:
-            classified["completed_verified"].append(_label(event))
+            classified["completed_verified"].append(event_label(event))
         elif event.get("commit"):
-            classified["in_progress"].append(_label(event))
+            classified["in_progress"].append(event_label(event))
 
     for event in events:
         event_type = event.get("event_type")
         evidence = event.get("evidence") or {}
         semantic = event.get("semantic") or {}
-        if event_type == "task_completed_claim":
+        if event_type == TASK_COMPLETED_CLAIM_EVENT_TYPE:
             if any(_matches_passed_verification(event, verification) for verification in passed_verifications):
-                classified["completed_verified"].append(_label(event))
+                classified["completed_verified"].append(event_label(event))
             else:
-                classified["completed_claimed"].append(_label(event))
-        elif event_type == "session_summary":
-            classified["session_summaries"].append(_label(event))
-        elif event_type == "task_blocked" or semantic.get("status") == "blocked":
-            classified["blocked"].append(_label(event))
-        elif event_type == "semantic_note":
-            classified["notes"].append(_label(event))
-        elif event_type == "agent_end" and event.get("exit_code") not in (None, 0):
-            classified["risky"].append(_label(event))
-        elif event_type == "verification" and evidence.get("verification_status") == "failed":
-            classified["risky"].append(_label(event))
-        elif event_type == "agent_start":
+                classified["completed_claimed"].append(event_label(event))
+        elif event_type == SESSION_SUMMARY_EVENT_TYPE:
+            classified["session_summaries"].append(event_label(event))
+        elif event_type == TASK_BLOCKED_EVENT_TYPE or semantic.get("status") == "blocked":
+            classified["blocked"].append(event_label(event))
+        elif event_type == SEMANTIC_NOTE_EVENT_TYPE:
+            classified["notes"].append(event_label(event))
+        elif event_type == AGENT_END_EVENT_TYPE and event.get("exit_code") not in (None, 0):
+            classified["risky"].append(event_label(event))
+        elif event_type == VERIFICATION_EVENT_TYPE and evidence.get("verification_status") == "failed":
+            classified["risky"].append(event_label(event))
+        elif event_type == AGENT_START_EVENT_TYPE:
             if _session_key(event) not in closed_sessions:
-                classified["in_progress"].append(_label(event))
+                classified["in_progress"].append(event_label(event))
 
     return classified
 
@@ -240,3 +265,35 @@ def render_markdown_report(
 
     lines.extend(["## Raw Event Count", f"- {raw_event_count}", ""])
     return "\n".join(lines)
+
+
+def resolve_report_date(date: str | None) -> str:
+    """Resolve a report date to a concrete local ISO day.
+
+    Passing ``None`` yields today, never a placeholder string, so every report
+    producer (CLI and MCP) writes a real ``YYYY-MM-DD.md`` file.
+    """
+    return date or datetime.now().astimezone().date().isoformat()
+
+
+def render_daily_report(root: str | Path | None, date: str | None) -> tuple[str, str, int]:
+    """Read events for ``date`` and render the daily Markdown report.
+
+    Returns ``(resolved_date, markdown, raw_event_count)``. This is the single
+    rendering path shared by ``agent-journal report`` and the MCP
+    ``journal_daily_report`` tool, so both always include provider coverage and
+    resolve the date identically.
+    """
+    # Imported here to keep report rendering usable without eagerly pulling the
+    # storage/sqlite stack at module import time.
+    from agent_journal.storage import read_events_for_date
+
+    resolved_date = resolve_report_date(date)
+    events = read_events_for_date(root, resolved_date)
+    markdown = render_markdown_report(
+        resolved_date,
+        classify_daily_work(events),
+        raw_event_count=len(events),
+        provider_coverage=build_provider_coverage(events),
+    )
+    return resolved_date, markdown, len(events)

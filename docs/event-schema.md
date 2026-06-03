@@ -43,7 +43,8 @@ Correlation rules:
   commit hash.
 - `session_id` links events emitted by the same agent process or MCP session.
   A `task_completed_claim` can become `completed_verified` when a passed
-  `verification` event has the same `session_id` and a compatible `repo`.
+  `verification` event has the same `session_id` and a compatible `repo`;
+  matching `session_id` is accepted only when task ids do not conflict.
 - MCP tools inherit `AGENT_JOURNAL_SESSION_ID` and git context from the MCP
   server process. This lets `journal_task_completed`, `journal_task_blocked`,
   and `journal_session_summary` correlate with wrapper session lifecycle events.
@@ -68,9 +69,19 @@ Correlation rules:
   transcripts or inventing completed work.
 - Duplicate `event_id` writes are ignored so SQLite and the daily JSONL mirror
   remain aligned.
+- SQLite stores the complete event payload in `raw_json`; `raw_json` is the source of truth.
+  denormalized index columns such as `ts`, `repo`, `agent`, `event_type`, and
+  `session_id` are query accelerators that can be rebuilt from `raw_json`.
+- Events with a future `schema_version` are skipped by current readers instead
+  of being silently misclassified.
 
 Privacy rules:
 
 - Do not log prompt transcripts by default.
 - Do not log full file contents.
-- Redact known API keys, bearer tokens, passwords, and secret-looking values.
+- Redact known API keys, bearer tokens, passwords, URL credentials, PEM private
+  keys, and secret-looking values in both structured fields and free text.
+- Journal directories and files are owner-only by default: directories are
+  written with `0700`, files and SQLite/WAL sidecars with `0600`.
+- Free-text semantic fields are capped by `MAX_SEMANTIC_TEXT`; oversized
+  `summary`, `note`, and `reason` values are truncated with `…[truncated]`.

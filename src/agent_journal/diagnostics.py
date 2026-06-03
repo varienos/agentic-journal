@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from agent_journal.events import JOURNAL_MISSING_STATUS, SESSION_SUMMARY_EVENT_TYPE, VERIFICATION_EVENT_TYPE
 from agent_journal.git_hooks import resolve_git_hook_path
 from agent_journal.report import DEFAULT_PROVIDERS, build_provider_coverage
 from agent_journal.storage import read_events_for_date
@@ -93,12 +94,12 @@ def _inside_git_worktree(cwd: Path) -> bool:
 def _event_counts(events: list[dict[str, Any]]) -> dict[str, int]:
     return {
         "raw": len(events),
-        "session_summaries": sum(1 for event in events if event.get("event_type") == "session_summary"),
+        "session_summaries": sum(1 for event in events if event.get("event_type") == SESSION_SUMMARY_EVENT_TYPE),
         "journal_missing": sum(
             1
             for event in events
-            if event.get("event_type") == "verification"
-            and (event.get("semantic") or {}).get("status") == "journal_missing"
+            if event.get("event_type") == VERIFICATION_EVENT_TYPE
+            and (event.get("semantic") or {}).get("status") == JOURNAL_MISSING_STATUS
         ),
     }
 

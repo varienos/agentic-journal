@@ -243,8 +243,9 @@ scripts/package-smoke.sh
 
 Confirm `pyproject.toml`, `src/agent_journal/__init__.py`, and
 `CHANGELOG.md` all describe the same version. `scripts/release-check.sh`
-enforces that version sync and verifies the changelog has both `[Unreleased]`
-and a dated section for the current version.
+enforces that the `pyproject.toml` and `__init__.py` versions match, and verifies
+the changelog has both an `[Unreleased]` section and a non-empty section for the
+current version.
 
 For a GitHub release:
 
@@ -301,16 +302,20 @@ Use a fixed date when reviewing past work:
 agent-journal web --date 2026-06-01 --port 8765
 ```
 
-The web server is local-only by default. Keep `--host 127.0.0.1` unless you
-intentionally expose it on your network. If exposure is intentional, require a
-token for the JSON API:
+The web server is local-only by default. With no token configured, `/api/events`
+is unauthenticated, so the dashboard refuses to bind a non-loopback host
+(anything other than `127.0.0.1`/`localhost`/`::1`) unless a token is set. To
+expose it on your network, you must pass a token:
 
 ```bash
 agent-journal web --host 0.0.0.0 --port 8765 --today --token "$AGENT_JOURNAL_WEB_TOKEN"
 ```
 
-Then open `http://host:8765/?token=...`. The static page reads the token from
-the URL and sends it as `X-Agent-Journal-Token` for `/api/events`. Requests with
-no token or the wrong token receive `401`.
+Then open `http://host:8765/?token=...`. The page reads the token from the URL,
+immediately strips it from the address bar/history, and sends it as the
+`X-Agent-Journal-Token` header for `/api/events`. Requests with no token or the
+wrong token receive `401`.
 
-You can also set `AGENT_JOURNAL_WEB_TOKEN` instead of passing `--token`.
+You can also set `AGENT_JOURNAL_WEB_TOKEN` instead of passing `--token`. Binding
+a non-loopback host without either fails fast with an error rather than serving
+the journal openly.

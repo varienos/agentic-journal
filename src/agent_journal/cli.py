@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Sequence
 
-from agent_journal.config import journal_root
+from agent_journal.config import journal_root, secure_dir, secure_file
 from agent_journal.diagnostics import build_doctor_report, build_doctor_result
-from agent_journal.events import normalize_event
-from agent_journal.git_context import get_git_context, get_head_commit_files
+from agent_journal.events import (
+    GIT_COMMIT_EVENT_TYPE,
+    JOURNAL_MISSING_STATUS,
+    SESSION_OUTCOME_EVENT_TYPES,
+    TASK_BLOCKED_EVENT_TYPE,
+    TASK_COMPLETED_CLAIM_EVENT_TYPE,
+    VERIFICATION_EVENT_TYPE,
+    normalize_event,
+)
+from agent_journal.git_context import event_context, get_git_context, get_head_commit_files
 from agent_journal.install import (
     claude_mcp_snippet,
     codex_mcp_snippet,
@@ -20,12 +27,9 @@ from agent_journal.install import (
     install_shell_profile,
     install_wrappers,
 )
-from agent_journal.report import build_provider_coverage, classify_daily_work, render_markdown_report
-from agent_journal.storage import read_events_for_date, write_event
+from agent_journal.report import build_provider_coverage, classify_daily_work, render_daily_report
+from agent_journal.storage import read_events_for_date, read_events_for_session, write_event
 from agent_journal.web import run_web_server
-
-SESSION_OUTCOME_EVENT_TYPES = {"session_summary", "task_completed_claim", "task_blocked"}
-JOURNAL_MISSING_STATUS = "journal_missing"
 
 
 def _add_event_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -130,9 +134,9 @@ def _event_from_args(args: argparse.Namespace) -> dict:
         semantic["outcome"] = args.outcome
     if args.reason:
         semantic["reason"] = args.reason
-    if args.event_type == "task_completed_claim":
+    if args.event_type == TASK_COMPLETED_CLAIM_EVENT_TYPE:
         semantic["status"] = "completed_claimed"
-    if args.event_type == "task_blocked":
+    if args.event_type == TASK_BLOCKED_EVENT_TYPE:
         semantic["status"] = "blocked"
 
     evidence = {}
@@ -142,7 +146,7 @@ def _event_from_args(args: argparse.Namespace) -> dict:
         evidence["verification_status"] = args.verification_status
 
     files_changed = git_context.get("changed_files") or []
-    if args.event_type == "git_commit":
+    if args.event_type == GIT_COMMIT_EVENT_TYPE:
         files_changed = get_head_commit_files(cwd)
 
     return normalize_event(
@@ -150,10 +154,7 @@ def _event_from_args(args: argparse.Namespace) -> dict:
             "event_type": args.event_type,
             "agent": args.agent,
             "session_id": args.session_id,
-            "cwd": str(cwd),
-            "repo": git_context.get("repo"),
-            "branch": git_context.get("branch"),
-            "commit": git_context.get("commit"),
+            **event_context(cwd, git=git_context),
             "command": args.agent_command,
             "exit_code": args.exit_code,
             "duration_ms": args.duration_ms,
@@ -181,16 +182,15 @@ def _report_date(args: argparse.Namespace) -> str:
 
 def _handle_report(args: argparse.Namespace) -> int:
     date = _report_date(args)
-    events = read_events_for_date(journal_root(), date)
-    markdown = render_markdown_report(
-        date,
-        classify_daily_work(events),
-        raw_event_count=len(events),
-        provider_coverage=build_provider_coverage(events),
-    )
-    output = Path(args.output).expanduser() if args.output else journal_root() / "reports" / f"{date}.md"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(markdown, encoding="utf-8")
+    resolved_date, markdown, _ = render_daily_report(journal_root(), date)
+    if args.output:
+        output = Path(args.output).expanduser()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(markdown, encoding="utf-8")
+    else:
+        output = secure_dir(journal_root() / "reports") / f"{resolved_date}.md"
+        output.write_text(markdown, encoding="utf-8")
+        secure_file(output)
     if args.print_report:
         print(markdown)
     else:
@@ -228,14 +228,18 @@ def _handle_doctor(args: argparse.Namespace) -> int:
 
 
 def _handle_web(args: argparse.Namespace) -> int:
-    run_web_server(
-        journal_root(),
-        args.host,
-        args.port,
-        args.date,
-        refresh_ms=args.refresh_ms,
-        api_token=args.token,
-    )
+    try:
+        run_web_server(
+            journal_root(),
+            args.host,
+            args.port,
+            args.date,
+            refresh_ms=args.refresh_ms,
+            api_token=args.token,
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
     return 0
 
 
@@ -290,7 +294,7 @@ def _has_semantic_session_entry(events: list[dict], session_id: str, agent: str)
 def _has_guard_fallback(events: list[dict], session_id: str, agent: str) -> bool:
     return any(
         _event_matches_session(event, session_id, agent)
-        and event.get("event_type") == "verification"
+        and event.get("event_type") == VERIFICATION_EVENT_TYPE
         and (event.get("semantic") or {}).get("status") == JOURNAL_MISSING_STATUS
         for event in events
     )
@@ -301,13 +305,10 @@ def _guard_fallback_event(args: argparse.Namespace) -> dict:
     git_context = get_git_context(cwd)
     return normalize_event(
         {
-            "event_type": "verification",
+            "event_type": VERIFICATION_EVENT_TYPE,
             "agent": args.agent,
             "session_id": args.session_id,
-            "cwd": str(cwd),
-            "repo": git_context.get("repo"),
-            "branch": git_context.get("branch"),
-            "commit": git_context.get("commit"),
+            **event_context(cwd, git=git_context),
             "files_changed": git_context.get("changed_files") or [],
             "semantic": {"status": JOURNAL_MISSING_STATUS, "note": args.note},
             "evidence": {
@@ -321,7 +322,7 @@ def _guard_fallback_event(args: argparse.Namespace) -> dict:
 def _handle_guard(args: argparse.Namespace) -> int:
     if args.guard_target == "session-end":
         root = journal_root()
-        events = read_events_for_date(root, None)
+        events = read_events_for_session(root, args.session_id)
         if _has_semantic_session_entry(events, args.session_id, args.agent):
             print("semantic journal entry exists")
             return 0

@@ -10,8 +10,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from agent_journal.report import build_provider_coverage, classify_daily_work
+from agent_journal.events import SESSION_SUMMARY_EVENT_TYPE, SESSION_VIEW_EVENT_TYPES
+from agent_journal.report import build_provider_coverage, classify_daily_work, event_label
 from agent_journal.storage import read_events_for_date
+
+LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 CLASSIFIED_KEYS = (
     "completed_verified",
@@ -34,26 +37,6 @@ def _selected_date(default_date: date | str | None) -> str:
     return default_date or _today_iso()
 
 
-def _event_label(event: dict[str, Any]) -> str:
-    semantic = event.get("semantic") or {}
-    bits = []
-    task_id = semantic.get("task_id") or event.get("task_id")
-    note = semantic.get("summary") or semantic.get("note") or semantic.get("reason")
-    outcome = semantic.get("outcome")
-    commit = event.get("commit")
-    if task_id:
-        bits.append(str(task_id))
-    if commit:
-        bits.append(str(commit)[:12])
-    if note:
-        bits.append(str(note))
-    if outcome:
-        bits.append(f"outcome={outcome}")
-    bits.append(f"agent={event.get('agent') or 'unknown'}")
-    bits.append(f"repo={event.get('repo') or event.get('cwd') or 'unknown'}")
-    return " - ".join(bits)
-
-
 def _event_view(event: dict[str, Any]) -> dict[str, Any]:
     semantic = event.get("semantic") or {}
     evidence = event.get("evidence") or {}
@@ -72,22 +55,22 @@ def _event_view(event: dict[str, Any]) -> dict[str, Any]:
         "summary": semantic.get("summary"),
         "note": semantic.get("note") or semantic.get("reason"),
         "verification_status": evidence.get("verification_status"),
-        "label": _event_label(event),
+        "label": event_label(event),
         "semantic": semantic,
         "evidence": evidence,
     }
 
 
-def _session_key(event: dict[str, Any]) -> tuple[str, str]:
+def _display_session_key(event: dict[str, Any]) -> tuple[str, str]:
     return (str(event.get("agent") or "unknown"), str(event.get("session_id") or event.get("event_id")))
 
 
 def build_session_views(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sessions: dict[tuple[str, str], dict[str, Any]] = {}
     for event in events:
-        if not event.get("session_id") and event.get("event_type") not in {"agent_start", "agent_end", "session_summary"}:
+        if not event.get("session_id") and event.get("event_type") not in SESSION_VIEW_EVENT_TYPES:
             continue
-        key = _session_key(event)
+        key = _display_session_key(event)
         semantic = event.get("semantic") or {}
         session = sessions.setdefault(
             key,
@@ -111,7 +94,7 @@ def build_session_views(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         session["branch"] = session["branch"] or event.get("branch")
         session["commit"] = session["commit"] or event.get("commit")
         session["event_types"].append(event.get("event_type"))
-        if event.get("event_type") == "session_summary":
+        if event.get("event_type") == SESSION_SUMMARY_EVENT_TYPE:
             session["summary"] = semantic.get("summary") or "No summary"
             session["outcome"] = semantic.get("outcome") or "unknown"
             session["missing_summary"] = False
@@ -412,6 +395,14 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
     const coverageEl = document.getElementById("coverage");
     const missingSummaryFallbackDiagnosis = "Likely cause: model did not call the MCP tool or the Agent Journal instruction was not loaded.";
 
+    const dashboardUrl = new URL(window.location.href);
+    const apiToken = dashboardUrl.searchParams.get("token") || "";
+    if (dashboardUrl.searchParams.has("token")) {{
+      // Keep the token out of the visible URL, browser history, and Referer.
+      dashboardUrl.searchParams.delete("token");
+      window.history.replaceState({{}}, "", dashboardUrl.toString());
+    }}
+
     function text(value) {{
       return value === null || value === undefined || value === "" ? "-" : String(value);
     }}
@@ -513,8 +504,7 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
 
     async function loadEvents() {{
       const date = dateEl.value;
-      const token = new URLSearchParams(window.location.search).get("token") || "";
-      const headers = token ? {{ "X-Agent-Journal-Token": token }} : {{}};
+      const headers = apiToken ? {{ "X-Agent-Journal-Token": apiToken }} : {{}};
       const response = await fetch(`/api/events?date=${{encodeURIComponent(date)}}`, {{
         cache: "no-store",
         headers,
@@ -547,15 +537,39 @@ def _write_response(handler: BaseHTTPRequestHandler, status: HTTPStatus, body: b
     handler.send_header("Content-Type", content_type)
     handler.send_header("Content-Length", str(len(body)))
     handler.send_header("Cache-Control", "no-store")
+    handler.send_header("X-Content-Type-Options", "nosniff")
+    # Avoid leaking a token passed via the dashboard URL through the Referer header.
+    handler.send_header("Referrer-Policy", "no-referrer")
     handler.end_headers()
     handler.wfile.write(body)
+
+
+def _is_loopback(host: str) -> bool:
+    return host in LOOPBACK_HOSTS
+
+
+def ensure_safe_binding(host: str, token: str | None) -> None:
+    """Fail closed: never expose the journal on a non-loopback host without a token.
+
+    With no token, ``/api/events`` is public, so binding ``0.0.0.0`` or a LAN
+    address would serve the entire journal to the network.
+    """
+    if not _is_loopback(host) and not token:
+        raise ValueError(
+            f"Refusing to serve on non-loopback host {host!r} without a token. "
+            "Set --token or AGENT_JOURNAL_WEB_TOKEN, or bind 127.0.0.1."
+        )
 
 
 def _is_authorized(handler: BaseHTTPRequestHandler, params: dict[str, list[str]], api_token: str | None) -> bool:
     if not api_token:
         return True
     provided = handler.headers.get("X-Agent-Journal-Token") or params.get("token", [""])[0]
-    return compare_digest(provided, api_token)
+    try:
+        return compare_digest(provided.encode("utf-8"), api_token.encode("utf-8"))
+    except (AttributeError, ValueError):
+        # Non-ASCII / non-string tokens must not crash the auth path; treat as unauthorized.
+        return False
 
 
 def create_web_handler(
@@ -607,8 +621,11 @@ def run_web_server(
     api_token: str | None = None,
 ) -> None:
     token = api_token or os.environ.get("AGENT_JOURNAL_WEB_TOKEN")
+    ensure_safe_binding(host, token)
     server = ThreadingHTTPServer((host, port), create_web_handler(root, default_date, refresh_ms, api_token=token))
     actual_host, actual_port = server.server_address
+    if not _is_loopback(host):
+        print("Agent Journal web: serving on a non-loopback host; token authentication is required.")
     print(f"Agent Journal web: http://{actual_host}:{actual_port}")
     try:
         server.serve_forever()
