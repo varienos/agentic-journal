@@ -3,20 +3,21 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from agent_journal.events import normalize_event
-from agent_journal.git_context import get_git_context
-from agent_journal.storage import read_events_for_date, write_event
+from agent_journal.events import (
+    SEMANTIC_NOTE_EVENT_TYPE,
+    SESSION_SUMMARY_EVENT_TYPE,
+    TASK_BLOCKED_EVENT_TYPE,
+    TASK_COMPLETED_CLAIM_EVENT_TYPE,
+    normalize_event,
+)
+from agent_journal.git_context import event_context
+from agent_journal.storage import write_event
 
 
 def _event_context(session_id: str | None = None) -> dict:
-    cwd = Path.cwd()
-    git_context = get_git_context(cwd)
     return {
         "session_id": session_id or os.environ.get("AGENT_JOURNAL_SESSION_ID"),
-        "cwd": str(cwd),
-        "repo": git_context.get("repo"),
-        "branch": git_context.get("branch"),
-        "commit": git_context.get("commit"),
+        **event_context(Path.cwd()),
     }
 
 
@@ -28,7 +29,7 @@ def journal_note(
 ) -> str:
     event = normalize_event(
         {
-            "event_type": "semantic_note",
+            "event_type": SEMANTIC_NOTE_EVENT_TYPE,
             "agent": agent,
             **_event_context(session_id),
             "semantic": {"note": note},
@@ -47,7 +48,7 @@ def journal_task_completed(
 ) -> str:
     event = normalize_event(
         {
-            "event_type": "task_completed_claim",
+            "event_type": TASK_COMPLETED_CLAIM_EVENT_TYPE,
             "agent": agent,
             **_event_context(session_id),
             "semantic": {"task_id": task_id, "status": "completed_claimed", "note": note},
@@ -70,7 +71,7 @@ def journal_session_summary(
         semantic["task_id"] = task_id
     event = normalize_event(
         {
-            "event_type": "session_summary",
+            "event_type": SESSION_SUMMARY_EVENT_TYPE,
             "agent": agent,
             **_event_context(session_id),
             "semantic": semantic,
@@ -89,7 +90,7 @@ def journal_task_blocked(
 ) -> str:
     event = normalize_event(
         {
-            "event_type": "task_blocked",
+            "event_type": TASK_BLOCKED_EVENT_TYPE,
             "agent": agent,
             **_event_context(session_id),
             "semantic": {"task_id": task_id, "status": "blocked", "reason": reason},
@@ -101,16 +102,15 @@ def journal_task_blocked(
 
 def journal_daily_report(journal_home: str | Path | None = None, date: str | None = None) -> str:
     # Import lazily so the lightweight semantic write helpers stay dependency-free.
-    from agent_journal.report import classify_daily_work, render_markdown_report
+    from agent_journal.config import journal_root, secure_dir, secure_file
+    from agent_journal.report import render_daily_report
 
-    events = read_events_for_date(journal_home, date)
-    report_date = date or (events[-1]["ts"][:10] if events else "today")
-    markdown = render_markdown_report(report_date, classify_daily_work(events), raw_event_count=len(events))
-    root = Path(journal_home).expanduser() if journal_home else Path.home() / ".agent-journal"
-    report_dir = root / "reports"
-    report_dir.mkdir(parents=True, exist_ok=True)
+    root = Path(journal_home).expanduser() if journal_home else journal_root()
+    report_date, markdown, _ = render_daily_report(root, date)
+    report_dir = secure_dir(root / "reports")
     path = report_dir / f"{report_date}.md"
     path.write_text(markdown, encoding="utf-8")
+    secure_file(path)
     return f"report: {path}"
 
 

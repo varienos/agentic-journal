@@ -9,3 +9,6 @@ __pycache__/
 tmp/
 smoke-journal/
 
+# Local agent guidance (not versioned)
+CLAUDE.md
+

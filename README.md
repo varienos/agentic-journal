@@ -198,15 +198,16 @@ existing hook still runs.
 
 ## Web Token
 
-The dashboard binds to `127.0.0.1` by default. If you expose it more broadly,
-protect the JSON API with a token:
+The dashboard binds to `127.0.0.1` by default. With no token, `/api/events` is
+unauthenticated, so binding a non-loopback host without a token is refused. To
+expose it more broadly, protect the JSON API with a token:
 
 ```bash
 agent-journal web --host 0.0.0.0 --port 8765 --today --token "$AGENT_JOURNAL_WEB_TOKEN"
 ```
 
-Open the page with `?token=...`; the browser sends that value as the
-`X-Agent-Journal-Token` header for `/api/events` requests.
+Open the page with `?token=...`; the page strips the token from the URL and
+sends it as the `X-Agent-Journal-Token` header for `/api/events` requests.
 
 ## Storage
 

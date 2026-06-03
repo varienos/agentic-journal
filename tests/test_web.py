@@ -4,9 +4,30 @@ import threading
 from datetime import date
 from http.server import ThreadingHTTPServer
 
+import pytest
+
 from agent_journal.events import normalize_event
 from agent_journal.storage import write_event
-from agent_journal.web import build_events_payload, create_web_handler, render_dashboard_html
+from agent_journal.web import (
+    _is_authorized,
+    build_events_payload,
+    create_web_handler,
+    ensure_safe_binding,
+    render_dashboard_html,
+)
+
+
+class _FakeHeaders:
+    def __init__(self, value):
+        self._value = value
+
+    def get(self, key, default=None):
+        return self._value if self._value is not None else default
+
+
+class _FakeHandler:
+    def __init__(self, header_token=None):
+        self.headers = _FakeHeaders(header_token)
 
 
 def _event(event_type, ts="2026-06-01T10:00:00+03:00", **updates):
@@ -175,7 +196,62 @@ def test_api_events_requires_token_when_configured(tmp_path):
         body = response.read()
         assert response.status == 200
         assert json.loads(body)["raw_event_count"] == 1
+
+        # Wrong token in header is rejected.
+        conn.request("GET", "/api/events?date=2026-06-01", headers={"X-Agent-Journal-Token": "nope"})
+        response = conn.getresponse()
+        assert response.status == 401
+        response.read()
+
+        # Token may also be supplied via the query string.
+        conn.request("GET", "/api/events?date=2026-06-01&token=secret")
+        response = conn.getresponse()
+        assert response.status == 200
+        response.read()
+
+        # Wrong token in the query string is rejected.
+        conn.request("GET", "/api/events?date=2026-06-01&token=nope")
+        response = conn.getresponse()
+        assert response.status == 401
+        response.read()
     finally:
         conn.close()
         server.shutdown()
         server.server_close()
+
+
+def test_api_events_is_open_when_no_token_configured(tmp_path):
+    write_event(tmp_path, _event("semantic_note", semantic={"note": "open"}))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_web_handler(tmp_path, "2026-06-01"))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    conn = http.client.HTTPConnection(host, port, timeout=5)
+    try:
+        conn.request("GET", "/api/events?date=2026-06-01")
+        response = conn.getresponse()
+        assert response.status == 200
+        assert response.getheader("X-Content-Type-Options") == "nosniff"
+        assert response.getheader("Referrer-Policy") == "no-referrer"
+        response.read()
+    finally:
+        conn.close()
+        server.shutdown()
+        server.server_close()
+
+
+def test_is_authorized_handles_non_ascii_token_without_crashing():
+    assert _is_authorized(_FakeHandler("ü" * 6), {}, "secret") is False
+    assert _is_authorized(_FakeHandler("secret"), {}, "secret") is True
+    assert _is_authorized(_FakeHandler(None), {"token": ["secret"]}, "secret") is True
+    assert _is_authorized(_FakeHandler(None), {}, None) is True
+
+
+def test_ensure_safe_binding_refuses_non_loopback_without_token():
+    with pytest.raises(ValueError, match="non-loopback"):
+        ensure_safe_binding("0.0.0.0", None)
+
+
+def test_ensure_safe_binding_allows_loopback_and_tokened_exposure():
+    ensure_safe_binding("127.0.0.1", None)
+    ensure_safe_binding("0.0.0.0", "secret")

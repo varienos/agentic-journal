@@ -1,4 +1,10 @@
-from agent_journal.report import build_provider_coverage, classify_daily_work, render_markdown_report
+from agent_journal.report import (
+    build_provider_coverage,
+    classify_daily_work,
+    event_label,
+    event_task_id,
+    render_markdown_report,
+)
 
 
 def test_commit_with_verification_is_completed_verified():
@@ -16,6 +22,18 @@ def test_commit_with_verification_is_completed_verified():
     )
 
     assert items["completed_verified"]
+
+
+def test_public_event_label_helpers_are_available():
+    event = {
+        "event_type": "semantic_note",
+        "agent": "codex",
+        "repo": "/repo",
+        "semantic": {"task_id": "TASK-1", "note": "Reviewed"},
+    }
+
+    assert event_task_id(event) == "TASK-1"
+    assert event_label(event) == "TASK-1 - Reviewed - agent=codex - repo=/repo"
 
 
 def test_verification_only_marks_matching_commit_verified():
@@ -144,12 +162,98 @@ def test_completion_claim_with_mismatched_repo_task_verification_stays_claimed()
     assert items["completed_claimed"] == ["TASK-10 - Implemented - agent=claude - repo=/repo-a"]
 
 
+def test_session_verification_does_not_leak_across_different_tasks():
+    # A passed verification for TASK-A must not verify an unrelated claim for
+    # TASK-B that merely shares the same session_id.
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "task_completed_claim",
+                "agent": "codex",
+                "session_id": "session-1",
+                "repo": "/repo",
+                "semantic": {"task_id": "TASK-B", "note": "Unverified work"},
+            },
+            {
+                "event_type": "verification",
+                "agent": "codex",
+                "session_id": "session-1",
+                "repo": "/repo",
+                "semantic": {"task_id": "TASK-A"},
+                "evidence": {"verification_status": "passed", "verification": "pytest"},
+            },
+        ]
+    )
+
+    assert items["completed_verified"] == []
+    assert items["completed_claimed"] == ["TASK-B - Unverified work - agent=codex - repo=/repo"]
+
+
+def test_claim_and_verification_with_all_empty_keys_stays_claimed():
+    # No commit / session_id / task_id on either side must never cross-verify.
+    items = classify_daily_work(
+        [
+            {"event_type": "task_completed_claim", "agent": "codex", "semantic": {"note": "Done"}},
+            {
+                "event_type": "verification",
+                "agent": "codex",
+                "evidence": {"verification_status": "passed"},
+            },
+        ]
+    )
+
+    assert items["completed_verified"] == []
+    assert items["completed_claimed"] == ["Done - agent=codex - repo=unknown repo"]
+
+
 def test_failed_agent_end_is_risky():
     items = classify_daily_work(
         [{"event_type": "agent_end", "agent": "claude", "exit_code": 1, "repo": "/repo"}]
     )
 
     assert items["risky"]
+
+
+def test_clean_agent_end_is_not_risky():
+    items = classify_daily_work(
+        [{"event_type": "agent_end", "agent": "claude", "exit_code": 0, "repo": "/repo"}]
+    )
+
+    assert items["risky"] == []
+
+
+def test_failed_agent_end_closes_matching_agent_start():
+    # A session that errored out should not appear in both Risky and In Progress.
+    items = classify_daily_work(
+        [
+            {"event_type": "agent_start", "agent": "codex", "session_id": "s1", "repo": "/repo"},
+            {
+                "event_type": "agent_end",
+                "agent": "codex",
+                "session_id": "s1",
+                "exit_code": 7,
+                "repo": "/repo",
+            },
+        ]
+    )
+
+    assert items["risky"]
+    assert items["in_progress"] == []
+
+
+def test_task_blocked_is_reported_as_blocked():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "task_blocked",
+                "agent": "gemini",
+                "repo": "/repo",
+                "semantic": {"task_id": "TASK-3", "status": "blocked", "reason": "waiting on API"},
+            }
+        ]
+    )
+
+    assert items["blocked"] == ["TASK-3 - waiting on API - agent=gemini - repo=/repo"]
 
 
 def test_semantic_notes_are_reported_as_notes():
