@@ -4,10 +4,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from agent_journal.events import JOURNAL_MISSING_STATUS, SESSION_SUMMARY_EVENT_TYPE, VERIFICATION_EVENT_TYPE
-from agent_journal.git_hooks import resolve_git_hook_path
-from agent_journal.report import DEFAULT_PROVIDERS, build_provider_coverage
-from agent_journal.storage import read_events_for_date
+from agentic_journal.events import JOURNAL_MISSING_STATUS, SESSION_SUMMARY_EVENT_TYPE, VERIFICATION_EVENT_TYPE
+from agentic_journal.git_hooks import resolve_git_hook_path
+from agentic_journal.report import DEFAULT_PROVIDERS, build_provider_coverage
+from agentic_journal.storage import read_events_for_date
 
 
 def _which(command: str, path_env: str | None = None) -> Path | None:
@@ -65,10 +65,10 @@ def _mcp_status(home: Path) -> dict[str, dict[str, str | None]]:
     }
     results = {}
     for agent, path in paths.items():
-        configured = _contains(path, ("agent-journal",)) or _contains(path, ("agent_journal",))
+        configured = _contains(path, ("agentic-journal",)) or _contains(path, ("agentic_journal",))
         if agent == "gemini" and not configured:
             project_path = home / ".gemini" / "projects.json"
-            if _contains(project_path, ("agent-journal",)):
+            if _contains(project_path, ("agentic-journal",)):
                 results[agent] = {"status": "configured", "path": str(project_path)}
                 continue
         results[agent] = {"status": "configured" if configured else "missing", "path": str(path)}
@@ -78,9 +78,9 @@ def _mcp_status(home: Path) -> dict[str, dict[str, str | None]]:
 def _git_hook_status(cwd: Path) -> dict[str, str | None]:
     hook = resolve_git_hook_path(cwd)
     if hook.exists():
-        if _contains(hook, ("agent-journal",)) and os.access(hook, os.X_OK):
+        if _contains(hook, ("agentic-journal",)) and os.access(hook, os.X_OK):
             return {"status": "ok", "path": str(hook)}
-        if _contains(hook, ("agent-journal",)):
+        if _contains(hook, ("agentic-journal",)):
             return {"status": "not_executable", "path": str(hook)}
         return {"status": "missing", "path": str(hook)}
     return {"status": "missing", "path": str(hook) if _inside_git_worktree(cwd) else None}
@@ -117,7 +117,11 @@ def build_doctor_result(
     home_path = Path(home).expanduser() if home else Path.home()
     cwd_path = Path(cwd).expanduser() if cwd else Path.cwd()
     events = read_events_for_date(root_path, report_date)
-    token = web_token if web_token is not None else os.environ.get("AGENT_JOURNAL_WEB_TOKEN")
+    token = (
+        web_token
+        if web_token is not None
+        else os.environ.get("AGENTIC_JOURNAL_WEB_TOKEN") or os.environ.get("AGENT_JOURNAL_WEB_TOKEN")
+    )
     return {
         "date": report_date,
         "wrappers": _wrapper_status(root_path, path_env),
@@ -135,7 +139,7 @@ def build_doctor_result(
 
 def build_doctor_report(result: dict[str, Any]) -> str:
     lines = [
-        "# Agent Journal Doctor",
+        "# Agentic Journal Doctor",
         f"Date: {result['date']}",
         "",
         "## Wrapper PATH",

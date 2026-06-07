@@ -6,8 +6,8 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from agent_journal.config import ensure_config, journal_root, secure_dir, secure_file
-from agent_journal.events import SCHEMA_VERSION
+from agentic_journal.config import ensure_config, journal_root, secure_dir, secure_file
+from agentic_journal.events import SCHEMA_VERSION
 
 
 def _date_from_ts(ts: str) -> str:
@@ -47,7 +47,7 @@ def read_jsonl_events(path: str | Path) -> Iterable[dict[str, Any]]:
 
 
 def db_file(root: str | Path | None = None) -> Path:
-    return Path(root).expanduser() / "agent-journal.db" if root else journal_root() / "agent-journal.db"
+    return Path(root).expanduser() / "agentic-journal.db" if root else journal_root() / "agentic-journal.db"
 
 
 def connect(root: str | Path | None = None) -> sqlite3.Connection:

@@ -1,7 +1,8 @@
 import pytest
 
-from agent_journal import storage
-from agent_journal.storage import (
+from agentic_journal import storage
+from agentic_journal.config import journal_root
+from agentic_journal.storage import (
     append_jsonl_event,
     init_db,
     insert_event,
@@ -24,6 +25,13 @@ def _event(event_id, ts="2026-05-31T10:00:00+03:00", **updates):
     }
     raw.update(updates)
     return raw
+
+
+def test_journal_root_accepts_legacy_home_env(tmp_path, monkeypatch):
+    monkeypatch.delenv("AGENTIC_JOURNAL_HOME", raising=False)
+    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path / "legacy-journal"))
+
+    assert journal_root() == (tmp_path / "legacy-journal").resolve()
 
 
 def test_append_jsonl_event_writes_by_date(tmp_path):
@@ -65,7 +73,7 @@ def test_sqlite_storage_uses_wal_and_reads_by_date(tmp_path):
 
 
 def test_write_event_keeps_jsonl_mirror_idempotent(tmp_path):
-    from agent_journal.storage import write_event
+    from agentic_journal.storage import write_event
 
     root = tmp_path / "journal"
     event = {
@@ -169,8 +177,8 @@ def test_write_event_secures_db_and_wal_sidecar_permissions(tmp_path):
     root = tmp_path / "journal"
     write_event(root, _event("e1"))
 
-    db_files = glob.glob(str(root / "agent-journal.db*"))
-    assert any(name.endswith("agent-journal.db") for name in db_files)
+    db_files = glob.glob(str(root / "agentic-journal.db*"))
+    assert any(name.endswith("agentic-journal.db") for name in db_files)
     for path in db_files:
         mode = stat.S_IMODE(os.stat(path).st_mode)
         assert mode == 0o600, (os.path.basename(path), oct(mode))

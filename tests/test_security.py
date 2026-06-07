@@ -1,6 +1,6 @@
 import pytest
 
-from agent_journal.security import redact_value
+from agentic_journal.security import redact_value
 
 
 def _token(*parts: str) -> str:

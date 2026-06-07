@@ -3,59 +3,59 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from agent_journal.git_hooks import resolve_git_hook_path
+from agentic_journal.git_hooks import resolve_git_hook_path
 
 
-SHELL_PROFILE_BEGIN = "# >>> agent-journal wrappers >>>"
-SHELL_PROFILE_END = "# <<< agent-journal wrappers <<<"
-AGENT_INSTRUCTIONS_BEGIN = "<!-- >>> agent-journal instructions >>> -->"
-AGENT_INSTRUCTIONS_END = "<!-- <<< agent-journal instructions <<< -->"
+SHELL_PROFILE_BEGIN = "# >>> agentic-journal wrappers >>>"
+SHELL_PROFILE_END = "# <<< agentic-journal wrappers <<<"
+AGENT_INSTRUCTIONS_BEGIN = "<!-- >>> agentic-journal instructions >>> -->"
+AGENT_INSTRUCTIONS_END = "<!-- <<< agentic-journal instructions <<< -->"
 
 WRAPPER_BODY = """#!/usr/bin/env sh
 set -u
-AGENT_JOURNAL_AGENT="{agent}"
-AGENT_JOURNAL_REAL_BIN="{real_bin}"
-export AGENT_JOURNAL_AGENT
-export AGENT_JOURNAL_REAL_BIN
-AGENT="$AGENT_JOURNAL_AGENT"
+AGENTIC_JOURNAL_AGENT="{agent}"
+AGENTIC_JOURNAL_REAL_BIN="{real_bin}"
+export AGENTIC_JOURNAL_AGENT
+export AGENTIC_JOURNAL_REAL_BIN
+AGENT="$AGENTIC_JOURNAL_AGENT"
 SESSION_ID="$(date +%s)-$$"
-AGENT_JOURNAL_SESSION_ID="$SESSION_ID"
-export AGENT_JOURNAL_SESSION_ID
+AGENTIC_JOURNAL_SESSION_ID="$SESSION_ID"
+export AGENTIC_JOURNAL_SESSION_ID
 START_TS="$(date +%s)"
-AGENT_JOURNAL_WARNED=0
+AGENTIC_JOURNAL_WARNED=0
 
-run_agent_journal() {{
-  if command -v agent-journal >/dev/null 2>&1; then
-    agent-journal "$@" >/dev/null 2>&1 || true
-  elif [ "$AGENT_JOURNAL_WARNED" -eq 0 ]; then
-    echo "agent-journal command not found; skipping journal command. Add the package bin directory to PATH." >&2
-    AGENT_JOURNAL_WARNED=1
+run_agentic_journal() {{
+  if command -v agentic-journal >/dev/null 2>&1; then
+    agentic-journal "$@" >/dev/null 2>&1 || true
+  elif [ "$AGENTIC_JOURNAL_WARNED" -eq 0 ]; then
+    echo "agentic-journal command not found; skipping journal command. Add the package bin directory to PATH." >&2
+    AGENTIC_JOURNAL_WARNED=1
   fi
 }}
 
 journal_event() {{
-  run_agent_journal event "$@"
+  run_agentic_journal event "$@"
 }}
 
 journal_event --type agent_start --agent "$AGENT" --session-id "$SESSION_ID" --command "$AGENT"
-"$AGENT_JOURNAL_REAL_BIN" "$@"
+"$AGENTIC_JOURNAL_REAL_BIN" "$@"
 STATUS=$?
 END_TS="$(date +%s)"
 DURATION_MS=$(( (END_TS - START_TS) * 1000 ))
 journal_event --type agent_end --agent "$AGENT" --session-id "$SESSION_ID" --command "$AGENT" --exit-code "$STATUS" --duration-ms "$DURATION_MS"
-run_agent_journal guard session-end --agent "$AGENT" --session-id "$SESSION_ID"
+run_agentic_journal guard session-end --agent "$AGENT" --session-id "$SESSION_ID"
 exit "$STATUS"
 """
 
 GIT_HOOK_BODY = """#!/usr/bin/env sh
 STATUS=0
-BACKUP="$(dirname "$0")/post-commit.agent-journal.bak"
+BACKUP="$(dirname "$0")/post-commit.agentic-journal.bak"
 if [ -x "$BACKUP" ]; then
   "$BACKUP" "$@" || STATUS=$?
 elif [ -f "$BACKUP" ]; then
   /usr/bin/env sh "$BACKUP" "$@" || STATUS=$?
 fi
-agent-journal event --type git_commit --agent "${AGENT_JOURNAL_AGENT:-git}" >/dev/null 2>&1 || true
+agentic-journal event --type git_commit --agent "${AGENTIC_JOURNAL_AGENT:-git}" >/dev/null 2>&1 || true
 exit "$STATUS"
 """
 
@@ -124,7 +124,7 @@ def install_wrappers(root: str | Path, real_bins: dict[str, str] | None = None) 
 def shell_profile_block(root: str | Path) -> str:
     bin_dir = Path(root).expanduser() / "bin"
     return f"""{SHELL_PROFILE_BEGIN}
-# Agent Journal wrappers: keep before real agent binaries, including login shells used by automations.
+# Agentic Journal wrappers: keep before real agent binaries, including login shells used by automations.
 if [ -d "{bin_dir}" ]; then
   export PATH="{bin_dir}:$PATH"
 fi
@@ -152,13 +152,13 @@ def install_shell_profile(
 
 def agent_instructions_block() -> str:
     return f"""{AGENT_INSTRUCTIONS_BEGIN}
-## Agent Journal Session Reporting
+## Agentic Journal Session Reporting
 
-- At the end of every meaningful work session, before the final response or session exit, write one semantic Agent Journal entry.
+- At the end of every meaningful work session, before the final response or session exit, write one semantic Agentic Journal entry.
 - Prefer the MCP tool `journal_session_summary` when available.
 - Include the current agent name, task id when known, outcome (`completed`, `in_progress`, `blocked`, `no_work`, or `unknown`), and a concise summary of what changed, what was verified, and what remains.
 - `journal_note` is only for incidental notes; it does not satisfy end-of-session reporting.
-- If MCP is unavailable, run `agent-journal event --type session_summary --agent <agent> --session-id "$AGENT_JOURNAL_SESSION_ID" --summary "<work summary>" --outcome <outcome>`.
+- If MCP is unavailable, run `agentic-journal event --type session_summary --agent <agent> --session-id "$AGENTIC_JOURNAL_SESSION_ID" --summary "<work summary>" --outcome <outcome>`.
 {AGENT_INSTRUCTIONS_END}
 """
 
@@ -190,7 +190,7 @@ def install_git_hook(repo: str | Path) -> Path:
     hooks_dir = target.parent
     hooks_dir.mkdir(parents=True, exist_ok=True)
     if target.exists():
-        backup = hooks_dir / "post-commit.agent-journal.bak"
+        backup = hooks_dir / "post-commit.agentic-journal.bak"
         if not backup.exists():
             backup.write_bytes(target.read_bytes())
             backup.chmod(target.stat().st_mode)
@@ -201,8 +201,8 @@ def install_git_hook(repo: str | Path) -> Path:
 
 def codex_mcp_snippet(project_path: str | Path | None = None) -> str:
     cwd = Path(project_path).expanduser() if project_path else project_root()
-    return f"""[mcp_servers.agent_journal]
-command = "agent-journal-mcp"
+    return f"""[mcp_servers.agentic_journal]
+command = "agentic-journal-mcp"
 args = []
 cwd = "{cwd}"
 startup_timeout_sec = 30
@@ -214,8 +214,8 @@ def claude_mcp_snippet(project_path: str | Path | None = None) -> str:
     cwd = Path(project_path).expanduser() if project_path else project_root()
     return f"""{{
   "mcpServers": {{
-    "agent-journal": {{
-      "command": "agent-journal-mcp",
+    "agentic-journal": {{
+      "command": "agentic-journal-mcp",
       "args": [],
       "cwd": "{cwd}"
     }}
@@ -228,8 +228,8 @@ def gemini_mcp_snippet(project_path: str | Path | None = None) -> str:
     cwd = Path(project_path).expanduser() if project_path else project_root()
     return f"""{{
   "mcpServers": {{
-    "agent-journal": {{
-      "command": "agent-journal-mcp",
+    "agentic-journal": {{
+      "command": "agentic-journal-mcp",
       "args": [],
       "cwd": "{cwd}"
     }}

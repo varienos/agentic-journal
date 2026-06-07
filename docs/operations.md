@@ -1,4 +1,4 @@
-# Agent Journal Operations
+# Agentic Journal Operations
 
 ## Backlog Workflow
 
@@ -26,7 +26,7 @@ Before opening a new task, run duplicate searches with at least:
 
 - the feature or fix area, for example `wrapper`, `packaging`, `evidence`
 - the user-visible symptom, for example `missing commit files`
-- the affected command or module, for example `agent-journal-mcp`
+- the affected command or module, for example `agentic-journal-mcp`
 
 When reporting task changes, include the task id, title, status, and the most
 important files inspected or changed. Keep implementation work out of task
@@ -57,7 +57,7 @@ enforcement, wrapper guard fallback behavior, and packaged dashboard rendering.
 Use the doctor command when setup behavior is unclear:
 
 ```bash
-agent-journal doctor --today
+agentic-journal doctor --today
 ```
 
 It reports wrapper PATH status, MCP configuration hints, global instruction
@@ -69,17 +69,17 @@ status, and dashboard/API token mode.
 Run from the source checkout without installing:
 
 ```bash
-uv run agent-journal --help
-uv run agent-journal report --today
-uv run agent-journal-mcp
+uv run agentic-journal --help
+uv run agentic-journal report --today
+uv run agentic-journal-mcp
 ```
 
 Use editable install while developing the package:
 
 ```bash
 uv pip install -e .
-agent-journal --help
-agent-journal install wrappers
+agentic-journal --help
+agentic-journal install wrappers
 ```
 
 Install globally with `uv tool` when the package is ready to use outside the
@@ -87,21 +87,21 @@ repo:
 
 ```bash
 uv tool install .
-agent-journal --help
-agent-journal install wrappers
-agent-journal install shell-profile
-agent-journal install agent-instructions
+agentic-journal --help
+agentic-journal install wrappers
+agentic-journal install shell-profile
+agentic-journal install agent-instructions
 ```
 
-Generated wrappers call `agent-journal` through `PATH`. `install shell-profile`
+Generated wrappers call `agentic-journal` through `PATH`. `install shell-profile`
 adds the package bin directory to both `.zprofile` and `.zshrc` before the real
 agent binaries. For one-off shells, the equivalent manual setup is:
 
 ```bash
-export PATH="$HOME/.agent-journal/bin:$PATH"
+export PATH="$HOME/.agentic-journal/bin:$PATH"
 ```
 
-If `agent-journal` is missing from `PATH`, a generated wrapper still runs the
+If `agentic-journal` is missing from `PATH`, a generated wrapper still runs the
 real agent and preserves its exit code, but prints a warning and skips journal
 event writes for that invocation.
 
@@ -112,8 +112,8 @@ End-of-day reports depend on explicit session outcome records. A generic
 did in a session. Before final response or session end, agents should write:
 
 ```bash
-agent-journal event --type session_summary --agent codex \
-  --session-id "$AGENT_JOURNAL_SESSION_ID" \
+agentic-journal event --type session_summary --agent codex \
+  --session-id "$AGENTIC_JOURNAL_SESSION_ID" \
   --task TASK-8 \
   --summary "Added session summary logging and dashboard grouping" \
   --outcome completed
@@ -123,7 +123,7 @@ MCP clients should prefer `journal_session_summary` with the same semantic
 fields. Supported outcomes are `completed`, `in_progress`, `blocked`, `no_work`,
 and `unknown`.
 
-MCP tools inherit `AGENT_JOURNAL_SESSION_ID` when present. They also attach the
+MCP tools inherit `AGENTIC_JOURNAL_SESSION_ID` when present. They also attach the
 current `cwd` and git repo, branch, and commit context from the MCP server
 process. This is important: `journal_task_completed` and `journal_task_blocked`
 only satisfy the guard for a wrapper session when they carry the same
@@ -135,7 +135,7 @@ Use the guard command at agent session end to make journaling auditable even whe
 the model does not voluntarily call an MCP tool:
 
 ```bash
-agent-journal guard session-end --agent claude --session-id "$AGENT_JOURNAL_SESSION_ID"
+agentic-journal guard session-end --agent claude --session-id "$AGENTIC_JOURNAL_SESSION_ID"
 ```
 
 If the session already has a `session_summary`, `task_completed_claim`, or
@@ -146,7 +146,7 @@ includes the current git `files_changed` list when available, giving objective
 context without capturing transcripts or inventing summaries. Running the guard
 multiple times for the same session is idempotent.
 
-Generated wrappers export `AGENT_JOURNAL_SESSION_ID` and call the guard after
+Generated wrappers export `AGENTIC_JOURNAL_SESSION_ID` and call the guard after
 `agent_end`, so wrapped Codex, Claude, and Gemini sessions are automatically
 flagged when they finish without a semantic journal entry.
 
@@ -165,13 +165,13 @@ they should let the guard record `journal_missing`.
 Install wrappers:
 
 ```bash
-agent-journal install wrappers
+agentic-journal install wrappers
 ```
 
 Install wrapper PATH setup for both login and interactive zsh sessions:
 
 ```bash
-agent-journal install shell-profile
+agentic-journal install shell-profile
 ```
 
 This updates `.zprofile` and `.zshrc`. The `.zprofile` entry matters for
@@ -182,14 +182,14 @@ Install the global instruction block that tells each model to write a semantic
 session summary before final response/session exit:
 
 ```bash
-agent-journal install agent-instructions
+agentic-journal install agent-instructions
 ```
 
 For one-off shells, put the generated bin directory before the real agent
 binaries manually:
 
 ```bash
-export PATH="$HOME/.agent-journal/bin:$PATH"
+export PATH="$HOME/.agentic-journal/bin:$PATH"
 ```
 
 ## Git Hook Setup
@@ -197,26 +197,26 @@ export PATH="$HOME/.agent-journal/bin:$PATH"
 Install into the current repo:
 
 ```bash
-agent-journal install git-hook --repo .
+agentic-journal install git-hook --repo .
 ```
 
 The hook records commit metadata without blocking commits. If an existing hook
-is present, the installer writes a `post-commit.agent-journal.bak` backup before
+is present, the installer writes a `post-commit.agentic-journal.bak` backup before
 replacing it. The generated hook runs that backup first and preserves the
-backup hook's exit code, while the Agent Journal write remains best-effort.
+backup hook's exit code, while the Agentic Journal write remains best-effort.
 
 ## MCP Setup
 
 Print Codex, Claude Code, and Gemini CLI config snippets:
 
 ```bash
-agent-journal install mcp-snippets
+agentic-journal install mcp-snippets
 ```
 
 The MCP command is:
 
 ```bash
-agent-journal-mcp
+agentic-journal-mcp
 ```
 
 The MVP semantic tools are:
@@ -241,7 +241,7 @@ scripts/verify.sh
 scripts/package-smoke.sh
 ```
 
-Confirm `pyproject.toml`, `src/agent_journal/__init__.py`, and
+Confirm `pyproject.toml`, `src/agentic_journal/__init__.py`, and
 `CHANGELOG.md` all describe the same version. `scripts/release-check.sh`
 enforces that the `pyproject.toml` and `__init__.py` versions match, and verifies
 the changelog has both an `[Unreleased]` section and a non-empty section for the
@@ -267,19 +267,19 @@ after the workflow completes to confirm the GitHub release exists.
 Generate today's report:
 
 ```bash
-agent-journal report --today
+agentic-journal report --today
 ```
 
 Cron example:
 
 ```bash
-0 23 * * * agent-journal report --today
+0 23 * * * agentic-journal report --today
 ```
 
 Codex automation prompt:
 
 ```text
-Generate today's Agent Journal report by running `agent-journal report --today`.
+Generate today's Agentic Journal report by running `agentic-journal report --today`.
 Summarize completed_verified, completed_claimed, in_progress, blocked, and risky items.
 Do not modify project files.
 ```
@@ -289,7 +289,7 @@ Do not modify project files.
 Run the local dashboard:
 
 ```bash
-agent-journal web --host 127.0.0.1 --port 8765 --today
+agentic-journal web --host 127.0.0.1 --port 8765 --today
 ```
 
 Open `http://127.0.0.1:8765`. The page polls `/api/events` every two seconds
@@ -299,7 +299,7 @@ risky guard entries.
 Use a fixed date when reviewing past work:
 
 ```bash
-agent-journal web --date 2026-06-01 --port 8765
+agentic-journal web --date 2026-06-01 --port 8765
 ```
 
 The web server is local-only by default. With no token configured, `/api/events`
@@ -308,7 +308,7 @@ is unauthenticated, so the dashboard refuses to bind a non-loopback host
 expose it on your network, you must pass a token:
 
 ```bash
-agent-journal web --host 0.0.0.0 --port 8765 --today --token "$AGENT_JOURNAL_WEB_TOKEN"
+agentic-journal web --host 0.0.0.0 --port 8765 --today --token "$AGENTIC_JOURNAL_WEB_TOKEN"
 ```
 
 Then open `http://host:8765/?token=...`. The page reads the token from the URL,
@@ -316,6 +316,6 @@ immediately strips it from the address bar/history, and sends it as the
 `X-Agent-Journal-Token` header for `/api/events`. Requests with no token or the
 wrong token receive `401`.
 
-You can also set `AGENT_JOURNAL_WEB_TOKEN` instead of passing `--token`. Binding
+You can also set `AGENTIC_JOURNAL_WEB_TOKEN` instead of passing `--token`. Binding
 a non-loopback host without either fails fast with an error rather than serving
 the journal openly.

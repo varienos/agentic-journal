@@ -1,10 +1,10 @@
-# Agent Journal Implementation Plan
+# Agentic Journal Implementation Plan
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a local observer-first journal that records what Codex, Claude Code, and Gemini CLI worked on during the day and produces an end-of-day evidence-based report.
 
-**Architecture:** Agent Journal treats observable facts as ground truth: CLI invocations, git commits, changed files, command exit codes, and test results. MCP is added as a semantic annotation layer so agents can attach notes, task IDs, and blocked/completed claims, but verified completion always comes from evidence.
+**Architecture:** Agentic Journal treats observable facts as ground truth: CLI invocations, git commits, changed files, command exit codes, and test results. MCP is added as a semantic annotation layer so agents can attach notes, task IDs, and blocked/completed claims, but verified completion always comes from evidence.
 
 **Tech Stack:** Python 3.11+, SQLite WAL, JSONL event mirror, stdio MCP server, POSIX shell wrappers, git hooks, pytest.
 
@@ -12,7 +12,7 @@
 
 ## Product Definition
 
-Agent Journal answers one daily question:
+Agentic Journal answers one daily question:
 
 > "Codex, Claude, and Gemini worked today. What actually got done, what is still in progress, and what needs review?"
 
@@ -23,7 +23,7 @@ The first useful version must work locally without a hosted service. It should n
 - Evidence first: commits, diffs, commands, exit codes, and test results are stronger than agent self-reporting.
 - MCP second: MCP tools add semantic notes, task IDs, and status claims.
 - Privacy by default: do not log full prompts, full tool arguments, API keys, or file contents in MVP.
-- Local first: all data lives under `~/.agent-journal`.
+- Local first: all data lives under `~/.agentic-journal`.
 - Small responses: MCP tools return short acknowledgements to avoid wasting model context.
 - Append-only events: raw events are immutable; reports are derived views.
 
@@ -39,16 +39,16 @@ The first useful version must work locally without a hosted service. It should n
 
 Create the project under:
 
-`/Users/varienos/Landing/Repo/agent-journal`
+`/Users/varienos/Landing/Repo/agentic-journal`
 
 Planned files:
 
 ```text
-agent-journal/
+agentic-journal/
   README.md
   pyproject.toml
   src/
-    agent_journal/
+    agentic_journal/
       __init__.py
       cli.py
       config.py
@@ -61,7 +61,7 @@ agent-journal/
       mcp_server.py
   scripts/
     wrappers/
-      agent-journal-wrapper.sh
+      agentic-journal-wrapper.sh
     hooks/
       post-commit
   tests/
@@ -78,15 +78,15 @@ agent-journal/
     operations.md
     superpowers/
       plans/
-        2026-05-31-agent-journal-implementation-plan.md
+        2026-05-31-agentic-journal-implementation-plan.md
 ```
 
 Runtime files:
 
 ```text
-~/.agent-journal/
+~/.agentic-journal/
   config.toml
-  agent-journal.db
+  agentic-journal.db
   events/
     2026-05-31.jsonl
   reports/
@@ -144,21 +144,21 @@ Allowed `event_type` values for MVP:
 ### Task 1: Initialize Python Package
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/pyproject.toml`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/__init__.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/cli.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/tests/test_cli.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/pyproject.toml`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/__init__.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/cli.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_cli.py`
 
 - [ ] **Step 1: Write CLI smoke test**
 
 ```python
-from agent_journal.cli import main
+from agentic_journal.cli import main
 
 
 def test_main_help_exits_cleanly(capsys):
     exit_code = main(["--help"])
     assert exit_code == 0
-    assert "agent-journal" in capsys.readouterr().out
+    assert "agentic-journal" in capsys.readouterr().out
 ```
 
 - [ ] **Step 2: Run test to verify it fails**
@@ -169,14 +169,14 @@ Run:
 pytest tests/test_cli.py -q
 ```
 
-Expected: FAIL because `agent_journal.cli` does not exist yet.
+Expected: FAIL because `agentic_journal.cli` does not exist yet.
 
 - [ ] **Step 3: Add minimal package and CLI**
 
 Implement `pyproject.toml` with:
 
-- package name: `agent-journal`
-- console script: `agent-journal = agent_journal.cli:entrypoint`
+- package name: `agentic-journal`
+- console script: `agentic-journal = agentic_journal.cli:entrypoint`
 - dev dependency group with `pytest`
 
 Implement `main(argv=None)` using `argparse`.
@@ -195,7 +195,7 @@ Expected: PASS.
 
 ```bash
 git add pyproject.toml src tests
-git commit -m "chore: bootstrap agent-journal package"
+git commit -m "chore: bootstrap agentic-journal package"
 ```
 
 ## Chunk 2: Append-Only Event Writer
@@ -203,14 +203,14 @@ git commit -m "chore: bootstrap agent-journal package"
 ### Task 2: Define Event Model and Validation
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/events.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/tests/test_events.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/docs/event-schema.md`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/events.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_events.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/docs/event-schema.md`
 
 - [ ] **Step 1: Write event normalization tests**
 
 ```python
-from agent_journal.events import normalize_event
+from agentic_journal.events import normalize_event
 
 
 def test_normalize_event_adds_required_fields():
@@ -270,13 +270,13 @@ Expected: PASS.
 ### Task 3: JSONL Storage
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/storage.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/tests/test_storage.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/storage.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_storage.py`
 
 - [ ] **Step 1: Write JSONL append/read tests**
 
 ```python
-from agent_journal.storage import append_jsonl_event, read_jsonl_events
+from agentic_journal.storage import append_jsonl_event, read_jsonl_events
 
 
 def test_append_jsonl_event_writes_by_date(tmp_path):
@@ -307,7 +307,7 @@ Expected: FAIL because storage functions do not exist.
 
 Implement:
 
-- `journal_root()` defaulting to `~/.agent-journal`
+- `journal_root()` defaulting to `~/.agentic-journal`
 - `append_jsonl_event(root, event)`
 - `read_jsonl_events(path)`
 - atomic line append with newline
@@ -325,13 +325,13 @@ Expected: PASS.
 ### Task 4: Detect Repository Context
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/git_context.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/tests/test_git_context.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/git_context.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_git_context.py`
 
 - [ ] **Step 1: Write tests for non-git and git directories**
 
 ```python
-from agent_journal.git_context import get_git_context
+from agentic_journal.git_context import get_git_context
 
 
 def test_get_git_context_returns_none_outside_repo(tmp_path):
@@ -377,25 +377,25 @@ Expected: PASS.
 ### Task 5: Git Post-Commit Hook Event
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/scripts/hooks/post-commit`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/cli.py`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/tests/test_cli.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/scripts/hooks/post-commit`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/cli.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_cli.py`
 
 - [ ] **Step 1: Add CLI test for `event git_commit`**
 
 ```python
 def test_event_command_accepts_git_commit(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     exit_code = main(["event", "--type", "git_commit", "--agent", "git"])
     assert exit_code == 0
 ```
 
-- [ ] **Step 2: Implement `agent-journal event`**
+- [ ] **Step 2: Implement `agentic-journal event`**
 
 Command:
 
 ```bash
-agent-journal event --type git_commit --agent git
+agentic-journal event --type git_commit --agent git
 ```
 
 It should:
@@ -409,7 +409,7 @@ It should:
 The script should call:
 
 ```bash
-agent-journal event --type git_commit --agent "${AGENT_JOURNAL_AGENT:-git}"
+agentic-journal event --type git_commit --agent "${AGENTIC_JOURNAL_AGENT:-git}"
 ```
 
 - [ ] **Step 4: Run tests**
@@ -425,16 +425,16 @@ Expected: PASS.
 ### Task 6: Generic Wrapper Script
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/scripts/wrappers/agent-journal-wrapper.sh`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/tests/test_cli.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/scripts/wrappers/agentic-journal-wrapper.sh`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_cli.py`
 
 - [ ] **Step 1: Define wrapper behavior**
 
 The wrapper receives:
 
 ```bash
-AGENT_JOURNAL_AGENT=codex
-AGENT_JOURNAL_REAL_BIN=/opt/homebrew/bin/codex
+AGENTIC_JOURNAL_AGENT=codex
+AGENTIC_JOURNAL_REAL_BIN=/opt/homebrew/bin/codex
 ```
 
 It logs:
@@ -469,28 +469,28 @@ Expected: PASS.
 ### Task 7: Installer for Wrapper Binaries
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/install.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/tests/test_install.py`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/cli.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/install.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_install.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/cli.py`
 
 - [ ] **Step 1: Write installer tests**
 
 Test that install creates:
 
 ```text
-~/.agent-journal/bin/codex
-~/.agent-journal/bin/claude
-~/.agent-journal/bin/gemini
+~/.agentic-journal/bin/codex
+~/.agentic-journal/bin/claude
+~/.agentic-journal/bin/gemini
 ```
 
 Each generated script should point to the detected real binary.
 
-- [ ] **Step 2: Implement `agent-journal install wrappers`**
+- [ ] **Step 2: Implement `agentic-journal install wrappers`**
 
 Command:
 
 ```bash
-agent-journal install wrappers
+agentic-journal install wrappers
 ```
 
 Behavior:
@@ -513,13 +513,13 @@ Expected: PASS.
 ### Task 8: Aggregate Daily Events
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/report.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/tests/test_report.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/report.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_report.py`
 
 - [ ] **Step 1: Write classification tests**
 
 ```python
-from agent_journal.report import classify_daily_work
+from agentic_journal.report import classify_daily_work
 
 
 def test_commit_with_verification_is_completed_verified():
@@ -590,18 +590,18 @@ pytest tests/test_report.py -q
 
 Expected: PASS.
 
-### Task 9: `agent-journal report --today`
+### Task 9: `agentic-journal report --today`
 
 **Files:**
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/cli.py`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/tests/test_cli.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/cli.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_cli.py`
 
 - [ ] **Step 1: Add CLI report test**
 
 Test command:
 
 ```bash
-agent-journal report --date 2026-05-31
+agentic-journal report --date 2026-05-31
 ```
 
 Expected:
@@ -632,8 +632,8 @@ Expected: PASS.
 ### Task 10: Add SQLite WAL Storage
 
 **Files:**
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/storage.py`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/tests/test_storage.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/storage.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_storage.py`
 
 - [ ] **Step 1: Write SQLite tests**
 
@@ -673,7 +673,7 @@ CREATE INDEX idx_events_type ON events(event_type);
 
 - [ ] **Step 3: Keep JSONL mirror**
 
-`agent-journal event` writes both:
+`agentic-journal event` writes both:
 
 - SQLite primary store
 - JSONL daily mirror
@@ -691,9 +691,9 @@ Expected: PASS.
 ### Task 11: Redact Sensitive Values
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/security.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/tests/test_security.py`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/events.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/security.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_security.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/events.py`
 
 - [ ] **Step 1: Write redaction tests**
 
@@ -733,9 +733,9 @@ Expected: PASS.
 ### Task 12: MCP Server with Semantic Tools
 
 **Files:**
-- Create: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/mcp_server.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/tests/test_mcp_server.py`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/pyproject.toml`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/mcp_server.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_mcp_server.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/pyproject.toml`
 
 - [ ] **Step 1: Add MCP dependency**
 
@@ -763,7 +763,7 @@ logged
 or:
 
 ```text
-report: /Users/varienos/.agent-journal/reports/2026-05-31.md
+report: /Users/varienos/.agentic-journal/reports/2026-05-31.md
 ```
 
 - [ ] **Step 4: Add tests**
@@ -783,11 +783,11 @@ Expected: PASS.
 ### Task 13: Installer for Git Hook and MCP Config Snippets
 
 **Files:**
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/install.py`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/tests/test_install.py`
-- Create: `/Users/varienos/Landing/Repo/agent-journal/docs/operations.md`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/install.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_install.py`
+- Create: `/Users/varienos/Landing/Repo/agentic-journal/docs/operations.md`
 
-- [ ] **Step 1: Implement `agent-journal install git-hook`**
+- [ ] **Step 1: Implement `agentic-journal install git-hook`**
 
 Preferred MVP:
 
@@ -796,7 +796,7 @@ Preferred MVP:
 
 Do not overwrite existing hooks without backup.
 
-- [ ] **Step 2: Implement `agent-journal install mcp-snippets`**
+- [ ] **Step 2: Implement `agentic-journal install mcp-snippets`**
 
 Print config snippets for:
 
@@ -829,28 +829,28 @@ Expected: PASS.
 ### Task 14: Report Automation Script
 
 **Files:**
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/docs/operations.md`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/src/agent_journal/cli.py`
-- Modify: `/Users/varienos/Landing/Repo/agent-journal/tests/test_cli.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/docs/operations.md`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/src/agentic_journal/cli.py`
+- Modify: `/Users/varienos/Landing/Repo/agentic-journal/tests/test_cli.py`
 
 - [ ] **Step 1: Add `report --today --write` behavior**
 
 Ensure:
 
 ```bash
-agent-journal report --today
+agentic-journal report --today
 ```
 
 writes:
 
 ```text
-~/.agent-journal/reports/YYYY-MM-DD.md
+~/.agentic-journal/reports/YYYY-MM-DD.md
 ```
 
 - [ ] **Step 2: Document cron example**
 
 ```bash
-0 23 * * * /Users/varienos/.agent-journal/bin/agent-journal report --today
+0 23 * * * /Users/varienos/.agentic-journal/bin/agentic-journal report --today
 ```
 
 - [ ] **Step 3: Document Codex automation prompt**
@@ -858,7 +858,7 @@ writes:
 Suggested prompt:
 
 ```text
-Generate today's Agent Journal report by running `agent-journal report --today`.
+Generate today's Agentic Journal report by running `agentic-journal report --today`.
 Summarize completed_verified, completed_claimed, in_progress, blocked, and risky items.
 Do not modify project files.
 ```
@@ -882,23 +882,23 @@ pytest -q
 Manual smoke test:
 
 ```bash
-agent-journal event --type agent_start --agent codex
-agent-journal event --type task_completed_claim --agent codex --task TASK-1 --note "Smoke test completed"
-agent-journal report --today --print
+agentic-journal event --type agent_start --agent codex
+agentic-journal event --type task_completed_claim --agent codex --task TASK-1 --note "Smoke test completed"
+agentic-journal report --today --print
 ```
 
 Expected:
 
-- event JSONL exists under `~/.agent-journal/events/`
-- SQLite DB exists under `~/.agent-journal/agent-journal.db`
+- event JSONL exists under `~/.agentic-journal/events/`
+- SQLite DB exists under `~/.agentic-journal/agentic-journal.db`
 - report contains `completed_claimed`
 
 Wrapper smoke test:
 
 ```bash
-export PATH="$HOME/.agent-journal/bin:$PATH"
+export PATH="$HOME/.agentic-journal/bin:$PATH"
 codex --help
-agent-journal report --today --print
+agentic-journal report --today --print
 ```
 
 Expected:
@@ -910,7 +910,7 @@ Git hook smoke test:
 
 ```bash
 git commit --allow-empty -m "test: agent journal hook"
-agent-journal report --today --print
+agentic-journal report --today --print
 ```
 
 Expected:
@@ -920,12 +920,12 @@ Expected:
 
 ## Definition of Done for MVP
 
-- `agent-journal event` writes normalized events.
+- `agentic-journal event` writes normalized events.
 - JSONL daily mirror works.
 - SQLite WAL storage works.
 - `codex`, `claude`, and `gemini` wrappers can log start/end without changing CLI exit behavior.
 - git post-commit hook can log commit metadata.
-- `agent-journal report --today` produces Markdown.
+- `agentic-journal report --today` produces Markdown.
 - Completion claims without evidence are not marked verified.
 - Sensitive values are redacted.
 - Installation docs explain wrapper, hook, MCP, and automation setup.
@@ -942,7 +942,7 @@ Expected:
 
 ## Open Questions
 
-- Should `agent-journal install` mutate global Codex/Claude/Gemini MCP configs automatically, or only print snippets?
+- Should `agentic-journal install` mutate global Codex/Claude/Gemini MCP configs automatically, or only print snippets?
 - Should reports be purely deterministic, or should an optional LLM summarizer rewrite them into executive prose?
 - Should `completed_verified` require a commit, or can a passing verification command plus no diff count as verified for non-code tasks?
 - Should this integrate with Backlog.md task IDs in a later phase?

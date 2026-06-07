@@ -1,6 +1,6 @@
 import subprocess
 
-from agent_journal.git_context import get_git_context
+from agentic_journal.git_context import get_git_context
 
 
 def test_get_git_context_returns_none_outside_repo(tmp_path):

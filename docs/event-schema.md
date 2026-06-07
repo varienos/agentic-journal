@@ -1,6 +1,6 @@
-# Agent Journal Event Schema
+# Agentic Journal Event Schema
 
-Agent Journal stores append-only events. Events are mirrored to daily JSONL files
+Agentic Journal stores append-only events. Events are mirrored to daily JSONL files
 and inserted into SQLite.
 
 Required fields:
@@ -45,7 +45,7 @@ Correlation rules:
   A `task_completed_claim` can become `completed_verified` when a passed
   `verification` event has the same `session_id` and a compatible `repo`;
   matching `session_id` is accepted only when task ids do not conflict.
-- MCP tools inherit `AGENT_JOURNAL_SESSION_ID` and git context from the MCP
+- MCP tools inherit `AGENTIC_JOURNAL_SESSION_ID` and git context from the MCP
   server process. This lets `journal_task_completed`, `journal_task_blocked`,
   and `journal_session_summary` correlate with wrapper session lifecycle events.
 - `semantic.task_id` links explicit task claims to explicit verification
@@ -60,7 +60,7 @@ Correlation rules:
   `completed_claimed` and commit work remains `in_progress`.
 - Failed verification events are reported as risky and do not verify matching
   tasks or commits.
-- `agent-journal guard session-end` writes a failed `verification` event with
+- `agentic-journal guard session-end` writes a failed `verification` event with
   `semantic.status = "journal_missing"` when a session ends without a
   `session_summary`, `task_completed_claim`, or `task_blocked` event. Generic
   `semantic_note` entries do not satisfy the session outcome requirement.

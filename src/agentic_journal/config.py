@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from agent_journal.events import SCHEMA_VERSION
+from agentic_journal.events import SCHEMA_VERSION
 
-DEFAULT_CONFIG = f"""# Agent Journal local configuration
+DEFAULT_CONFIG = f"""# Agentic Journal local configuration
 [journal]
 schema_version = {SCHEMA_VERSION}
 jsonl_mirror = true
@@ -45,10 +45,10 @@ def secure_file(path: str | Path) -> Path:
 
 
 def journal_root() -> Path:
-    configured = os.environ.get("AGENT_JOURNAL_HOME")
+    configured = os.environ.get("AGENTIC_JOURNAL_HOME") or os.environ.get("AGENT_JOURNAL_HOME")
     if configured:
         return Path(configured).expanduser().resolve()
-    return Path.home() / ".agent-journal"
+    return Path.home() / ".agentic-journal"
 
 
 def ensure_config(root: str | Path | None = None) -> Path:

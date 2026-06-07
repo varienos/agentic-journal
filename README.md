@@ -1,18 +1,18 @@
-# Agent Journal
+# Agentic Journal
 
-[![CI](https://github.com/varienos/agent-journal/actions/workflows/ci.yml/badge.svg)](https://github.com/varienos/agent-journal/actions/workflows/ci.yml)
+[![CI](https://github.com/varienos/agentic-journal/actions/workflows/ci.yml/badge.svg)](https://github.com/varienos/agentic-journal/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-2f6f9f)
 ![License](https://img.shields.io/badge/license-MIT-2f6f9f)
 ![Local First](https://img.shields.io/badge/local--first-agent%20journal-126b5f)
 
-Agent Journal is a local, observer-first activity journal for AI coding agents.
+Agentic Journal is a local, observer-first activity journal for AI coding agents.
 It records verifiable events from Codex, Claude Code, Gemini CLI, git commits,
 and semantic MCP notes, then produces daily Markdown reports and a live local
 dashboard.
 
 ## Why
 
-Multiple agents can work on the same machine during the day. Agent Journal gives
+Multiple agents can work on the same machine during the day. Agentic Journal gives
 them a shared append-only journal so you can review what happened at the end of
 the day in a style close to git history:
 
@@ -23,12 +23,12 @@ the day in a style close to git history:
 - risky sessions that ended without a semantic journal entry
 
 The project is intentionally local-first. Runtime data is stored under
-`~/.agent-journal` by default.
+`~/.agentic-journal` by default.
 
 ## Features
 
-- Local CLI: `agent-journal`
-- MCP server: `agent-journal-mcp`
+- Local CLI: `agentic-journal`
+- MCP server: `agentic-journal-mcp`
 - Agent wrappers for `codex`, `claude`, and `gemini`
 - Session-end guard for missing semantic journal entries
 - Required session summary events for useful end-of-day reports
@@ -45,23 +45,23 @@ The project is intentionally local-first. Runtime data is stored under
 Clone the GitHub repo:
 
 ```bash
-git clone https://github.com/varienos/agent-journal.git
-cd agent-journal
+git clone https://github.com/varienos/agentic-journal.git
+cd agentic-journal
 uv sync --dev
 ```
 
 From the source checkout:
 
 ```bash
-uv run agent-journal --help
-uv run agent-journal-mcp
+uv run agentic-journal --help
+uv run agentic-journal-mcp
 ```
 
 Install globally with `uv tool`:
 
 ```bash
 uv tool install .
-agent-journal --help
+agentic-journal --help
 ```
 
 Refresh an existing global install from this checkout:
@@ -75,46 +75,46 @@ uv tool install . --force --reinstall --refresh
 Install wrappers for local agent commands:
 
 ```bash
-agent-journal install wrappers
+agentic-journal install wrappers
 ```
 
 Install the wrapper PATH block into both login and interactive zsh profiles:
 
 ```bash
-agent-journal install shell-profile
+agentic-journal install shell-profile
 ```
 
 This writes the wrapper directory into `.zprofile` and `.zshrc`, so terminal
 sessions and shell-based automations resolve `codex`, `claude`, and `gemini`
-through Agent Journal before the real binaries.
+through Agentic Journal before the real binaries.
 
 Install the global model instruction that requires end-of-session summaries:
 
 ```bash
-agent-journal install agent-instructions
+agentic-journal install agent-instructions
 ```
 
-This adds a marked Agent Journal section to Codex, Claude, and Gemini global
+This adds a marked Agentic Journal section to Codex, Claude, and Gemini global
 instruction files. Agents should use the MCP `journal_session_summary` tool
 before their final response or session exit.
 
 For one-off shells, the equivalent PATH setup is:
 
 ```bash
-export PATH="$HOME/.agent-journal/bin:$PATH"
+export PATH="$HOME/.agentic-journal/bin:$PATH"
 ```
 
 Record a manual semantic note:
 
 ```bash
-agent-journal event --type semantic_note --agent codex --note "Reviewed README setup"
+agentic-journal event --type semantic_note --agent codex --note "Reviewed README setup"
 ```
 
 Record the outcome of an agent session:
 
 ```bash
-agent-journal event --type session_summary --agent codex \
-  --session-id "$AGENT_JOURNAL_SESSION_ID" \
+agentic-journal event --type session_summary --agent codex \
+  --session-id "$AGENTIC_JOURNAL_SESSION_ID" \
   --task TASK-8 \
   --summary "Added session summary logging and dashboard grouping" \
   --outcome completed
@@ -123,19 +123,19 @@ agent-journal event --type session_summary --agent codex \
 Generate today's report:
 
 ```bash
-agent-journal report --today --print
+agentic-journal report --today --print
 ```
 
 Audit setup and provider coverage:
 
 ```bash
-agent-journal doctor --today
+agentic-journal doctor --today
 ```
 
 Run the live dashboard:
 
 ```bash
-agent-journal web --host 127.0.0.1 --port 8765 --today
+agentic-journal web --host 127.0.0.1 --port 8765 --today
 ```
 
 Open `http://127.0.0.1:8765`.
@@ -145,13 +145,13 @@ Open `http://127.0.0.1:8765`.
 Print ready-to-copy MCP snippets for Codex, Claude Code, and Gemini CLI:
 
 ```bash
-agent-journal install mcp-snippets
+agentic-journal install mcp-snippets
 ```
 
 The MCP command is:
 
 ```bash
-agent-journal-mcp
+agentic-journal-mcp
 ```
 
 Available MCP tools:
@@ -162,18 +162,18 @@ Available MCP tools:
 - `journal_task_blocked`
 - `journal_daily_report`
 
-MCP writes inherit `AGENT_JOURNAL_SESSION_ID` when present and attach the
+MCP writes inherit `AGENTIC_JOURNAL_SESSION_ID` when present and attach the
 current working directory plus git repo, branch, and commit context. This keeps
 MCP outcome events correlated with wrapper `agent_start` / `agent_end` events
 and prevents the session guard from reporting false missing-summary risks.
 
 ## Guarding Agent Sessions
 
-The wrapper flow exports an `AGENT_JOURNAL_SESSION_ID`, writes `agent_start` and
+The wrapper flow exports an `AGENTIC_JOURNAL_SESSION_ID`, writes `agent_start` and
 `agent_end`, then runs:
 
 ```bash
-agent-journal guard session-end --agent claude --session-id "$AGENT_JOURNAL_SESSION_ID"
+agentic-journal guard session-end --agent claude --session-id "$AGENTIC_JOURNAL_SESSION_ID"
 ```
 
 Before final response or session end, agents should call
@@ -188,12 +188,12 @@ session under risky items so silent sessions are visible.
 Install the post-commit hook into a repo:
 
 ```bash
-agent-journal install git-hook --repo .
+agentic-journal install git-hook --repo .
 ```
 
 The hook records commit metadata and changed files without blocking commits. If
 a `post-commit` hook already exists, the installer backs it up to
-`post-commit.agent-journal.bak` and chains it from the generated hook so the
+`post-commit.agentic-journal.bak` and chains it from the generated hook so the
 existing hook still runs.
 
 ## Web Token
@@ -203,7 +203,7 @@ unauthenticated, so binding a non-loopback host without a token is refused. To
 expose it more broadly, protect the JSON API with a token:
 
 ```bash
-agent-journal web --host 0.0.0.0 --port 8765 --today --token "$AGENT_JOURNAL_WEB_TOKEN"
+agentic-journal web --host 0.0.0.0 --port 8765 --today --token "$AGENTIC_JOURNAL_WEB_TOKEN"
 ```
 
 Open the page with `?token=...`; the page strips the token from the URL and
@@ -211,17 +211,17 @@ sends it as the `X-Agent-Journal-Token` header for `/api/events` requests.
 
 ## Storage
 
-Agent Journal writes each event to both:
+Agentic Journal writes each event to both:
 
-- `~/.agent-journal/events/YYYY-MM-DD.jsonl`
-- `~/.agent-journal/agent-journal.db`
+- `~/.agentic-journal/events/YYYY-MM-DD.jsonl`
+- `~/.agentic-journal/agentic-journal.db`
 
 Duplicate `event_id` writes are ignored in both SQLite and the JSONL mirror so
 the two stores stay aligned.
 
 Reports are written to:
 
-- `~/.agent-journal/reports/YYYY-MM-DD.md`
+- `~/.agentic-journal/reports/YYYY-MM-DD.md`
 
 See [docs/event-schema.md](docs/event-schema.md) for event fields, correlation
 rules, and privacy expectations.
@@ -261,11 +261,11 @@ The improvement roadmap lives in
 
 ## Privacy
 
-Agent Journal is designed to avoid prompt transcript capture by default. Event
+Agentic Journal is designed to avoid prompt transcript capture by default. Event
 writers should not log full file contents, prompt bodies, or secrets. Known API
 keys, bearer tokens, passwords, and secret-looking values are redacted by the
 event normalization path.
 
 ## License
 
-Agent Journal is released under the [MIT License](LICENSE).
+Agentic Journal is released under the [MIT License](LICENSE).

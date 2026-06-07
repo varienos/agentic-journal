@@ -13,9 +13,9 @@ def _load_release_tools():
 def test_release_check_validates_project_version_tag_and_changelog(tmp_path):
     tools = _load_release_tools()
     root = tmp_path
-    (root / "src" / "agent_journal").mkdir(parents=True)
+    (root / "src" / "agentic_journal").mkdir(parents=True)
     (root / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
-    (root / "src" / "agent_journal" / "__init__.py").write_text('__version__ = "1.2.3"\n', encoding="utf-8")
+    (root / "src" / "agentic_journal" / "__init__.py").write_text('__version__ = "1.2.3"\n', encoding="utf-8")
     (root / "CHANGELOG.md").write_text(
         "# Changelog\n\n"
         "## [Unreleased]\n\n"
@@ -35,9 +35,9 @@ def test_release_check_validates_project_version_tag_and_changelog(tmp_path):
 def test_release_check_rejects_version_mismatches(tmp_path):
     tools = _load_release_tools()
     root = tmp_path
-    (root / "src" / "agent_journal").mkdir(parents=True)
+    (root / "src" / "agentic_journal").mkdir(parents=True)
     (root / "pyproject.toml").write_text('[project]\nversion = "1.2.3"\n', encoding="utf-8")
-    (root / "src" / "agent_journal" / "__init__.py").write_text('__version__ = "1.2.4"\n', encoding="utf-8")
+    (root / "src" / "agentic_journal" / "__init__.py").write_text('__version__ = "1.2.4"\n', encoding="utf-8")
     (root / "CHANGELOG.md").write_text(
         "# Changelog\n\n## [Unreleased]\n\n## [1.2.3] - 2026-06-02\n- Notes.\n",
         encoding="utf-8",

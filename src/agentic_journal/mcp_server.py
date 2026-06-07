@@ -3,20 +3,22 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from agent_journal.events import (
+from agentic_journal.events import (
     SEMANTIC_NOTE_EVENT_TYPE,
     SESSION_SUMMARY_EVENT_TYPE,
     TASK_BLOCKED_EVENT_TYPE,
     TASK_COMPLETED_CLAIM_EVENT_TYPE,
     normalize_event,
 )
-from agent_journal.git_context import event_context
-from agent_journal.storage import write_event
+from agentic_journal.git_context import event_context
+from agentic_journal.storage import write_event
 
 
 def _event_context(session_id: str | None = None) -> dict:
     return {
-        "session_id": session_id or os.environ.get("AGENT_JOURNAL_SESSION_ID"),
+        "session_id": session_id
+        or os.environ.get("AGENTIC_JOURNAL_SESSION_ID")
+        or os.environ.get("AGENT_JOURNAL_SESSION_ID"),
         **event_context(Path.cwd()),
     }
 
@@ -102,8 +104,8 @@ def journal_task_blocked(
 
 def journal_daily_report(journal_home: str | Path | None = None, date: str | None = None) -> str:
     # Import lazily so the lightweight semantic write helpers stay dependency-free.
-    from agent_journal.config import journal_root, secure_dir, secure_file
-    from agent_journal.report import render_daily_report
+    from agentic_journal.config import journal_root, secure_dir, secure_file
+    from agentic_journal.report import render_daily_report
 
     root = Path(journal_home).expanduser() if journal_home else journal_root()
     report_date, markdown, _ = render_daily_report(root, date)
@@ -118,9 +120,9 @@ def create_mcp_server():
     try:
         from mcp.server.fastmcp import FastMCP
     except ImportError as exc:
-        raise RuntimeError("The 'mcp' package is required to run agent-journal-mcp") from exc
+        raise RuntimeError("The 'mcp' package is required to run agentic-journal-mcp") from exc
 
-    server = FastMCP("agent-journal")
+    server = FastMCP("agentic-journal")
 
     @server.tool(name="journal_note")
     def journal_note_tool(agent: str = "unknown", note: str = "", session_id: str = "") -> str:

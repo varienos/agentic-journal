@@ -1,4 +1,4 @@
-from agent_journal.report import (
+from agentic_journal.report import (
     build_provider_coverage,
     classify_daily_work,
     event_label,
@@ -337,7 +337,7 @@ def test_render_markdown_report_includes_required_sections():
         },
     )
 
-    assert "# 2026-05-31 Agent Journal" in markdown
+    assert "# 2026-05-31 Agentic Journal" in markdown
     assert "Evidence Levels" in markdown
     assert "Verified Work" in markdown
     assert "Provider Coverage" in markdown

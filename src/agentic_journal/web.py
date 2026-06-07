@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from agent_journal.events import SESSION_SUMMARY_EVENT_TYPE, SESSION_VIEW_EVENT_TYPES
-from agent_journal.report import build_provider_coverage, classify_daily_work, event_label
-from agent_journal.storage import read_events_for_date
+from agentic_journal.events import SESSION_SUMMARY_EVENT_TYPE, SESSION_VIEW_EVENT_TYPES
+from agentic_journal.report import build_provider_coverage, classify_daily_work, event_label
+from agentic_journal.storage import read_events_for_date
 
 LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
@@ -104,7 +104,7 @@ def build_session_views(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             session["diagnosis"] = (
                 "Wrapper captured start/end or session activity, but no "
                 "journal_session_summary was written. Likely cause: model did "
-                "not call the MCP tool or the Agent Journal instruction was not loaded."
+                "not call the MCP tool or the Agentic Journal instruction was not loaded."
             )
             session["outcome"] = "unknown"
         if session.get("commit"):
@@ -134,7 +134,7 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Agent Journal Live</title>
+  <title>Agentic Journal Live</title>
   <style>
     :root {{
       --bg: #f6f7f9;
@@ -339,7 +339,7 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
   <header>
     <div class="topbar">
       <div>
-        <h1>Agent Journal Live</h1>
+        <h1>Agentic Journal Live</h1>
         <div class="status"><span class="dot"></span><span id="status">Waiting for events</span></div>
       </div>
       <div class="controls">
@@ -393,7 +393,7 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
     const eventsEl = document.getElementById("events");
     const sessionsEl = document.getElementById("sessions");
     const coverageEl = document.getElementById("coverage");
-    const missingSummaryFallbackDiagnosis = "Likely cause: model did not call the MCP tool or the Agent Journal instruction was not loaded.";
+    const missingSummaryFallbackDiagnosis = "Likely cause: model did not call the MCP tool or the Agentic Journal instruction was not loaded.";
 
     const dashboardUrl = new URL(window.location.href);
     const apiToken = dashboardUrl.searchParams.get("token") || "";
@@ -557,7 +557,7 @@ def ensure_safe_binding(host: str, token: str | None) -> None:
     if not _is_loopback(host) and not token:
         raise ValueError(
             f"Refusing to serve on non-loopback host {host!r} without a token. "
-            "Set --token or AGENT_JOURNAL_WEB_TOKEN, or bind 127.0.0.1."
+            "Set --token or AGENTIC_JOURNAL_WEB_TOKEN, or bind 127.0.0.1."
         )
 
 
@@ -620,14 +620,14 @@ def run_web_server(
     refresh_ms: int = 2000,
     api_token: str | None = None,
 ) -> None:
-    token = api_token or os.environ.get("AGENT_JOURNAL_WEB_TOKEN")
+    token = api_token or os.environ.get("AGENTIC_JOURNAL_WEB_TOKEN") or os.environ.get("AGENT_JOURNAL_WEB_TOKEN")
     ensure_safe_binding(host, token)
     server = ThreadingHTTPServer((host, port), create_web_handler(root, default_date, refresh_ms, api_token=token))
     actual_host, actual_port = server.server_address
     if not _is_loopback(host):
-        print("Agent Journal web: serving on a non-loopback host; token authentication is required.")
-    print(f"Agent Journal web: http://{actual_host}:{actual_port}")
+        print("Agentic Journal web: serving on a non-loopback host; token authentication is required.")
+    print(f"Agentic Journal web: http://{actual_host}:{actual_port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("Stopping Agent Journal web")
+        print("Stopping Agentic Journal web")
