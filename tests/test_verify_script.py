@@ -8,9 +8,9 @@ def test_verify_script_declares_ci_smoke_checks():
     text = script.read_text()
     assert "uv run pytest -q" in text
     assert "python -m compileall -q src" in text
-    assert "AGENT_JOURNAL_HOME" in text
-    assert "agent-journal report" in text
-    assert "agent-journal web --help" in text
+    assert "AGENTIC_JOURNAL_HOME" in text
+    assert "agentic-journal report" in text
+    assert "agentic-journal web --help" in text
     assert "session_summary" in text
     assert "journal_session_summary" in text
     assert "X-Agent-Journal-Token" in text

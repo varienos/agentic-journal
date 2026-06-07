@@ -7,7 +7,7 @@ def test_native_hooks_doc_keeps_scope_and_links_guard_command():
 
     assert doc.exists()
     text = doc.read_text(encoding="utf-8")
-    assert "agent-journal guard session-end" in text
+    assert "agentic-journal guard session-end" in text
     assert "Claude SessionEnd" in text
     assert "Gemini hook" in text
     assert "Codex" in text

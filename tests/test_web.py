@@ -6,9 +6,9 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from agent_journal.events import normalize_event
-from agent_journal.storage import write_event
-from agent_journal.web import (
+from agentic_journal.events import normalize_event
+from agentic_journal.storage import write_event
+from agentic_journal.web import (
     _is_authorized,
     build_events_payload,
     create_web_handler,
@@ -69,7 +69,7 @@ def test_build_events_payload_returns_summary_and_latest_events(tmp_path):
             ts="2026-06-01T10:01:00+03:00",
             session_id="missing-1",
             semantic={"status": "journal_missing", "note": "Session ended without semantic journal entry"},
-            evidence={"verification_status": "failed", "verification": "agent-journal guard session-end"},
+            evidence={"verification_status": "failed", "verification": "agentic-journal guard session-end"},
         ),
     )
 
@@ -106,7 +106,7 @@ def test_build_events_payload_marks_started_session_missing_summary(tmp_path):
 def test_render_dashboard_html_contains_live_dashboard_controls():
     html = render_dashboard_html(default_date=date(2026, 6, 1), refresh_ms=2000)
 
-    assert "Agent Journal Live" in html
+    assert "Agentic Journal Live" in html
     assert "/api/events" in html
     assert "X-Agent-Journal-Token" in html
     assert "setInterval" in html
@@ -121,7 +121,7 @@ def test_render_dashboard_html_contains_live_dashboard_controls():
 
 def test_web_handler_without_explicit_date_uses_current_day_per_request(tmp_path, monkeypatch):
     current = {"date": "2026-06-02"}
-    monkeypatch.setattr("agent_journal.web._today_iso", lambda: current["date"])
+    monkeypatch.setattr("agentic_journal.web._today_iso", lambda: current["date"])
     server = ThreadingHTTPServer(("127.0.0.1", 0), create_web_handler(tmp_path, None))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -148,7 +148,7 @@ def test_web_handler_without_explicit_date_uses_current_day_per_request(tmp_path
 
 
 def test_web_handler_with_explicit_date_keeps_that_date(tmp_path, monkeypatch):
-    monkeypatch.setattr("agent_journal.web._today_iso", lambda: "2026-06-02")
+    monkeypatch.setattr("agentic_journal.web._today_iso", lambda: "2026-06-02")
     server = ThreadingHTTPServer(("127.0.0.1", 0), create_web_handler(tmp_path, "2026-06-01"))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

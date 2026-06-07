@@ -31,10 +31,10 @@ def read_pyproject_version(root: str | Path) -> str:
 
 
 def read_package_version(root: str | Path) -> str:
-    init_file = Path(root) / "src" / "agent_journal" / "__init__.py"
+    init_file = Path(root) / "src" / "agentic_journal" / "__init__.py"
     match = VERSION_RE.search(init_file.read_text(encoding="utf-8"))
     if not match:
-        raise ReleaseError("__version__ is missing from src/agent_journal/__init__.py")
+        raise ReleaseError("__version__ is missing from src/agentic_journal/__init__.py")
     return match.group(1)
 
 

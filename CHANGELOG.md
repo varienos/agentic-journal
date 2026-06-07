@@ -24,13 +24,13 @@ and this project uses `vMAJOR.MINOR.PATCH` Git tags for GitHub releases.
 ### Fixed
 
 - Web dashboard now computes the default date per request unless an explicit
-  `--date` is provided, so long-running `agent-journal web --today` servers roll
+  `--date` is provided, so long-running `agentic-journal web --today` servers roll
   over to the current day after midnight.
 - Verification correlation no longer marks an unrelated task claim as verified
   just because it shares a session with a passed verification for a different
   task.
 - `journal_daily_report` (MCP) now resolves a real date instead of writing
-  `today.md`, and includes provider coverage, matching `agent-journal report`.
+  `today.md`, and includes provider coverage, matching `agentic-journal report`.
 - Event writes keep the SQLite store and JSONL mirror consistent: a failed
   mirror append rolls back the SQLite row instead of permanently desyncing.
 - The session-end guard queries by indexed `session_id` instead of scanning the
@@ -48,12 +48,12 @@ and this project uses `vMAJOR.MINOR.PATCH` Git tags for GitHub releases.
 
 ### Added
 
-- Local `agent-journal` CLI for append-only AI agent activity events.
-- `agent-journal-mcp` server with semantic note, session summary, completed, blocked, and daily report tools.
+- Local `agentic-journal` CLI for append-only AI agent activity events.
+- `agentic-journal-mcp` server with semantic note, session summary, completed, blocked, and daily report tools.
 - Codex, Claude, and Gemini wrapper installer with session start/end capture and missing-summary guard.
 - Daily Markdown reports with verified, claimed, observed, blocked, notes, and risky evidence buckets.
 - Live local web dashboard with provider coverage and missing-summary diagnosis.
-- `agent-journal doctor` setup audit for wrappers, MCP config hints, instructions, hooks, token mode, and provider coverage.
+- `agentic-journal doctor` setup audit for wrappers, MCP config hints, instructions, hooks, token mode, and provider coverage.
 - Git post-commit hook installer that records commit metadata and changed files.
 - Native hook guidance for Claude SessionEnd, Gemini hooks, and Codex automation.
 - GitHub CI, package smoke checks, release metadata checks, and tag-driven GitHub release automation.

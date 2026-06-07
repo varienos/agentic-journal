@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
-from agent_journal.security import redact_value
+from agentic_journal.security import redact_value
 
 SCHEMA_VERSION = 1
 

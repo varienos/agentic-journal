@@ -4,20 +4,20 @@ import subprocess
 import sys
 from pathlib import Path
 
-from agent_journal.cli import main
-from agent_journal.install import generate_wrapper_script
-from agent_journal.mcp_server import journal_task_blocked, journal_task_completed
+from agentic_journal.cli import main
+from agentic_journal.install import generate_wrapper_script
+from agentic_journal.mcp_server import journal_task_blocked, journal_task_completed
 
 
 def test_main_help_exits_cleanly(capsys):
     exit_code = main(["--help"])
 
     assert exit_code == 0
-    assert "agent-journal" in capsys.readouterr().out
+    assert "agentic-journal" in capsys.readouterr().out
 
 
 def test_event_command_writes_jsonl(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
 
     exit_code = main(["event", "--type", "agent_start", "--agent", "codex"])
 
@@ -32,7 +32,7 @@ def test_event_command_writes_jsonl(tmp_path, monkeypatch):
 
 
 def test_event_command_accepts_semantic_fields(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
 
     exit_code = main(
         [
@@ -56,7 +56,7 @@ def test_event_command_accepts_semantic_fields(tmp_path, monkeypatch):
 
 
 def test_event_command_writes_session_summary_fields(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
 
     exit_code = main(
         [
@@ -87,7 +87,7 @@ def test_event_command_writes_session_summary_fields(tmp_path, monkeypatch):
 
 
 def test_report_command_writes_markdown(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "task_completed_claim", "--agent", "codex", "--task", "TASK-1"])
 
     exit_code = main(["report", "--date", "2026-05-31"])
@@ -99,7 +99,7 @@ def test_report_command_writes_markdown(tmp_path, monkeypatch):
 
 
 def test_report_command_accepts_explicit_write_flag(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
 
     exit_code = main(["report", "--date", "2026-05-31", "--write"])
 
@@ -108,7 +108,7 @@ def test_report_command_accepts_explicit_write_flag(tmp_path, monkeypatch):
 
 
 def test_status_command_prints_today_summary(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "agent_start", "--agent", "codex"])
 
     exit_code = main(["status", "--date", "2026-05-31"])
@@ -118,7 +118,7 @@ def test_status_command_prints_today_summary(tmp_path, monkeypatch, capsys):
 
 
 def test_doctor_command_prints_setup_and_coverage(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "agent_start", "--agent", "codex", "--session-id", "doctor-1"])
     main(
         [
@@ -140,7 +140,7 @@ def test_doctor_command_prints_setup_and_coverage(tmp_path, monkeypatch, capsys)
 
     assert exit_code == 0
     output = capsys.readouterr().out
-    assert "Agent Journal Doctor" in output
+    assert "Agentic Journal Doctor" in output
     assert "Session summaries:" in output
     assert "codex:" in output
 
@@ -163,7 +163,7 @@ def test_web_command_without_explicit_date_uses_dynamic_default(monkeypatch):
         calls["default_date"] = default_date
         calls["refresh_ms"] = refresh_ms
 
-    monkeypatch.setattr("agent_journal.cli.run_web_server", fake_run_web_server)
+    monkeypatch.setattr("agentic_journal.cli.run_web_server", fake_run_web_server)
 
     exit_code = main(["web", "--today", "--refresh-ms", "3000"])
 
@@ -178,7 +178,7 @@ def test_web_command_with_explicit_date_keeps_that_date(monkeypatch):
     def fake_run_web_server(root, host, port, default_date, refresh_ms=2000, api_token=None):
         calls["default_date"] = default_date
 
-    monkeypatch.setattr("agent_journal.cli.run_web_server", fake_run_web_server)
+    monkeypatch.setattr("agentic_journal.cli.run_web_server", fake_run_web_server)
 
     exit_code = main(["web", "--date", "2026-06-01"])
 
@@ -187,7 +187,7 @@ def test_web_command_with_explicit_date_keeps_that_date(monkeypatch):
 
 
 def test_guard_session_end_writes_risky_fallback_when_semantic_entry_is_missing(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-1"])
     main(["event", "--type", "agent_end", "--agent", "claude", "--session-id", "session-1"])
 
@@ -206,7 +206,7 @@ def test_guard_session_end_writes_risky_fallback_when_semantic_entry_is_missing(
 
 
 def test_guard_session_end_skips_when_semantic_entry_exists(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-2"])
     main(
         [
@@ -232,7 +232,7 @@ def test_guard_session_end_skips_when_semantic_entry_exists(tmp_path, monkeypatc
 
 
 def test_guard_session_end_requires_session_outcome_not_generic_note(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-3"])
     main(["event", "--type", "semantic_note", "--agent", "claude", "--session-id", "session-3", "--note", "FYI"])
 
@@ -256,7 +256,7 @@ def test_guard_session_end_records_changed_files_as_objective_fallback_context(t
     subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "add tracked"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
     (repo / "tracked.txt").write_text("after\n", encoding="utf-8")
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(journal))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(journal))
     monkeypatch.chdir(repo)
     main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-files"])
 
@@ -270,7 +270,7 @@ def test_guard_session_end_records_changed_files_as_objective_fallback_context(t
 
 
 def test_guard_session_end_skips_when_session_summary_exists(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-4"])
     main(
         [
@@ -298,8 +298,8 @@ def test_guard_session_end_skips_when_session_summary_exists(tmp_path, monkeypat
 
 
 def test_guard_session_end_skips_when_mcp_task_completed_uses_session_env(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
-    monkeypatch.setenv("AGENT_JOURNAL_SESSION_ID", "session-5")
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_SESSION_ID", "session-5")
     main(["event", "--type", "agent_start", "--agent", "claude", "--session-id", "session-5"])
     journal_task_completed(agent="claude", task_id="TASK-5", note="Done")
 
@@ -313,8 +313,8 @@ def test_guard_session_end_skips_when_mcp_task_completed_uses_session_env(tmp_pa
 
 
 def test_guard_session_end_skips_when_mcp_task_blocked_uses_session_env(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(tmp_path))
-    monkeypatch.setenv("AGENT_JOURNAL_SESSION_ID", "session-6")
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTIC_JOURNAL_SESSION_ID", "session-6")
     main(["event", "--type", "agent_start", "--agent", "gemini", "--session-id", "session-6"])
     journal_task_blocked(agent="gemini", task_id="TASK-6", reason="Missing key")
 
@@ -336,15 +336,15 @@ def test_wrapper_preserves_exit_code_and_logs_events(tmp_path):
     wrapper.chmod(0o755)
     shim_dir = tmp_path / "bin"
     shim_dir.mkdir()
-    agent_journal = shim_dir / "agent-journal"
-    agent_journal.write_text(
-        f'#!/usr/bin/env sh\nPYTHONPATH="{Path("src").resolve()}" "{sys.executable}" -m agent_journal.cli "$@"\n',
+    agentic_journal = shim_dir / "agentic-journal"
+    agentic_journal.write_text(
+        f'#!/usr/bin/env sh\nPYTHONPATH="{Path("src").resolve()}" "{sys.executable}" -m agentic_journal.cli "$@"\n',
         encoding="utf-8",
     )
-    agent_journal.chmod(0o755)
+    agentic_journal.chmod(0o755)
 
     env = os.environ.copy()
-    env["AGENT_JOURNAL_HOME"] = str(tmp_path / "journal")
+    env["AGENTIC_JOURNAL_HOME"] = str(tmp_path / "journal")
     env["PATH"] = f"{shim_dir}:{env['PATH']}"
 
     result = subprocess.run([str(wrapper)], env=env, check=False)
@@ -366,7 +366,7 @@ def test_git_commit_event_records_head_commit_and_committed_files(tmp_path, monk
     subprocess.run(["git", "add", "tracked.txt"], cwd=repo, check=True)
     subprocess.run(["git", "commit", "-m", "add tracked"], cwd=repo, check=True, stdout=subprocess.DEVNULL)
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
-    monkeypatch.setenv("AGENT_JOURNAL_HOME", str(journal))
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(journal))
     monkeypatch.chdir(repo)
 
     exit_code = main(["event", "--type", "git_commit", "--agent", "git"])

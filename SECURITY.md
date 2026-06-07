@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Agent Journal is pre-1.0. Security fixes are applied to the `main` branch.
+Agentic Journal is pre-1.0. Security fixes are applied to the `main` branch.
 
 ## Reporting Security Issues
 
@@ -14,7 +14,7 @@ repository, or contact the repository owner from the GitHub profile.
 
 ## Security Expectations
 
-Agent Journal is designed to avoid prompt transcript capture by default. Event
+Agentic Journal is designed to avoid prompt transcript capture by default. Event
 writers should not record full prompts, full file contents, API keys, bearer
 tokens, passwords, or other secrets.
 

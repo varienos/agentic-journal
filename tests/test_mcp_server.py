@@ -1,13 +1,13 @@
 import subprocess
 
-from agent_journal.mcp_server import (
+from agentic_journal.mcp_server import (
     create_mcp_server,
     journal_note,
     journal_session_summary,
     journal_task_blocked,
     journal_task_completed,
 )
-from agent_journal.storage import read_events_for_date
+from agentic_journal.storage import read_events_for_date
 
 
 def _init_git_repo(path):
@@ -71,7 +71,7 @@ def test_mcp_tools_attach_session_and_git_context(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     head = _init_git_repo(repo)
     monkeypatch.chdir(repo)
-    monkeypatch.setenv("AGENT_JOURNAL_SESSION_ID", "session-env")
+    monkeypatch.setenv("AGENTIC_JOURNAL_SESSION_ID", "session-env")
 
     journal_note(journal_home=tmp_path / "journal", agent="codex", note="Investigated")
     journal_task_completed(journal_home=tmp_path / "journal", agent="claude", task_id="TASK-2", note="Done")
@@ -92,13 +92,23 @@ def test_mcp_tools_attach_session_and_git_context(tmp_path, monkeypatch):
     assert {event["cwd"] for event in events} == {str(repo)}
 
 
+def test_mcp_tools_accept_legacy_session_env(tmp_path, monkeypatch):
+    monkeypatch.delenv("AGENTIC_JOURNAL_SESSION_ID", raising=False)
+    monkeypatch.setenv("AGENT_JOURNAL_SESSION_ID", "legacy-session")
+
+    journal_note(journal_home=tmp_path, agent="codex", note="legacy session")
+
+    event = read_events_for_date(tmp_path, None)[0]
+    assert event["session_id"] == "legacy-session"
+
+
 def test_create_mcp_server_has_expected_name_or_clear_dependency_error():
     try:
         server = create_mcp_server()
     except RuntimeError as exc:
         assert "mcp" in str(exc).lower()
     else:
-        assert getattr(server, "name", None) == "agent-journal"
+        assert getattr(server, "name", None) == "agentic-journal"
 
 
 def test_create_mcp_server_registers_expected_tool_names():

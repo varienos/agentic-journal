@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Agent Journal contributors are expected to keep discussions respectful,
+Agentic Journal contributors are expected to keep discussions respectful,
 specific, and focused on the work.
 
 ## Expected Behavior

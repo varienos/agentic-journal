@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
-export AGENT_JOURNAL_HOME="$TMP_ROOT/journal"
+export AGENTIC_JOURNAL_HOME="$TMP_ROOT/journal"
 export PATH="$ROOT/.venv/bin:$PATH"
 
 cd "$ROOT"
@@ -14,16 +14,16 @@ scripts/release-check.sh
 uv run pytest -q
 uv run python -m compileall -q src
 
-uv run agent-journal event --type agent_start --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --note "verify smoke"
-uv run agent-journal event --type session_summary --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --summary "verify smoke session summary" --outcome completed
-uv run agent-journal event --type task_completed_claim --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --note "verify smoke completed"
-uv run agent-journal guard session-end --agent codex --session-id VERIFY-SESSION >/dev/null
-uv run agent-journal event --type agent_start --agent claude --session-id VERIFY-MISSING --note "missing semantic smoke"
-uv run agent-journal guard session-end --agent claude --session-id VERIFY-MISSING >/dev/null
-uv run agent-journal guard session-end --agent claude --session-id VERIFY-MISSING >/dev/null
-uv run agent-journal report --today --print >/dev/null
-uv run agent-journal status --today >/dev/null
-uv run agent-journal web --help >/dev/null
+uv run agentic-journal event --type agent_start --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --note "verify smoke"
+uv run agentic-journal event --type session_summary --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --summary "verify smoke session summary" --outcome completed
+uv run agentic-journal event --type task_completed_claim --agent codex --session-id VERIFY-SESSION --task VERIFY-SMOKE --note "verify smoke completed"
+uv run agentic-journal guard session-end --agent codex --session-id VERIFY-SESSION >/dev/null
+uv run agentic-journal event --type agent_start --agent claude --session-id VERIFY-MISSING --note "missing semantic smoke"
+uv run agentic-journal guard session-end --agent claude --session-id VERIFY-MISSING >/dev/null
+uv run agentic-journal guard session-end --agent claude --session-id VERIFY-MISSING >/dev/null
+uv run agentic-journal report --today --print >/dev/null
+uv run agentic-journal status --today >/dev/null
+uv run agentic-journal web --help >/dev/null
 
 mkdir -p "$TMP_ROOT/real"
 cat > "$TMP_ROOT/real/codex" <<'SH'
@@ -33,12 +33,12 @@ SH
 chmod +x "$TMP_ROOT/real/codex"
 
 uv run python - <<PY
-from agent_journal.install import install_wrappers
+from agentic_journal.install import install_wrappers
 install_wrappers("$TMP_ROOT/wrapper-journal", {"codex": "$TMP_ROOT/real/codex"})
 PY
 
 set +e
-AGENT_JOURNAL_HOME="$TMP_ROOT/wrapper-journal" "$TMP_ROOT/wrapper-journal/bin/codex"
+AGENTIC_JOURNAL_HOME="$TMP_ROOT/wrapper-journal" "$TMP_ROOT/wrapper-journal/bin/codex"
 WRAPPER_STATUS=$?
 set -e
 test "$WRAPPER_STATUS" -eq 7
@@ -64,7 +64,7 @@ printf 'hello\n' > "$TMP_ROOT/repo/tracked.txt"
 git -C "$TMP_ROOT/repo" add tracked.txt
 git -C "$TMP_ROOT/repo" commit -m "add tracked" >/dev/null
 
-(cd "$TMP_ROOT/repo" && AGENT_JOURNAL_HOME="$TMP_ROOT/git-journal" "$ROOT/.venv/bin/agent-journal" event --type git_commit --agent git >/dev/null)
+(cd "$TMP_ROOT/repo" && AGENTIC_JOURNAL_HOME="$TMP_ROOT/git-journal" "$ROOT/.venv/bin/agentic-journal" event --type git_commit --agent git >/dev/null)
 
 uv run python - <<PY
 from pathlib import Path
@@ -80,7 +80,7 @@ assert event["files_changed"] == ["tracked.txt"]
 PY
 
 uv run python - <<'PY'
-from agent_journal.mcp_server import create_mcp_server
+from agentic_journal.mcp_server import create_mcp_server
 
 server = create_mcp_server()
 expected = {
@@ -94,9 +94,9 @@ assert expected.issubset(set(server._tool_manager._tools))
 PY
 
 uv run python - <<PY
-from agent_journal.events import normalize_event
-from agent_journal.storage import write_event
-from agent_journal.web import create_web_handler
+from agentic_journal.events import normalize_event
+from agentic_journal.storage import write_event
+from agentic_journal.web import create_web_handler
 from http.server import ThreadingHTTPServer
 import http.client
 import json
@@ -129,4 +129,4 @@ finally:
     server.server_close()
 PY
 
-echo "agent-journal verification passed"
+echo "agentic-journal verification passed"

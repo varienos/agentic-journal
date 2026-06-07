@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from agent_journal.events import (
+from agentic_journal.events import (
     AGENT_END_EVENT_TYPE,
     AGENT_START_EVENT_TYPE,
     GIT_COMMIT_EVENT_TYPE,
@@ -223,7 +223,7 @@ def render_markdown_report(
     provider_coverage: dict[str, dict[str, int]] | None = None,
 ) -> str:
     lines = [
-        f"# {date} Agent Journal",
+        f"# {date} Agentic Journal",
         "",
         "## Summary",
         f"- Completed verified: {len(classified.get('completed_verified', []))}",
@@ -280,13 +280,13 @@ def render_daily_report(root: str | Path | None, date: str | None) -> tuple[str,
     """Read events for ``date`` and render the daily Markdown report.
 
     Returns ``(resolved_date, markdown, raw_event_count)``. This is the single
-    rendering path shared by ``agent-journal report`` and the MCP
+    rendering path shared by ``agentic-journal report`` and the MCP
     ``journal_daily_report`` tool, so both always include provider coverage and
     resolve the date identically.
     """
     # Imported here to keep report rendering usable without eagerly pulling the
     # storage/sqlite stack at module import time.
-    from agent_journal.storage import read_events_for_date
+    from agentic_journal.storage import read_events_for_date
 
     resolved_date = resolve_report_date(date)
     events = read_events_for_date(root, resolved_date)

@@ -1,7 +1,7 @@
 import pytest
 
-from agent_journal.config import DEFAULT_CONFIG
-from agent_journal.events import MAX_SEMANTIC_TEXT, SCHEMA_VERSION, normalize_event
+from agentic_journal.config import DEFAULT_CONFIG
+from agentic_journal.events import MAX_SEMANTIC_TEXT, SCHEMA_VERSION, normalize_event
 
 
 def test_normalize_event_adds_required_fields():

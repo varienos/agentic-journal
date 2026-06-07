@@ -6,9 +6,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Sequence
 
-from agent_journal.config import journal_root, secure_dir, secure_file
-from agent_journal.diagnostics import build_doctor_report, build_doctor_result
-from agent_journal.events import (
+from agentic_journal.config import journal_root, secure_dir, secure_file
+from agentic_journal.diagnostics import build_doctor_report, build_doctor_result
+from agentic_journal.events import (
     GIT_COMMIT_EVENT_TYPE,
     JOURNAL_MISSING_STATUS,
     SESSION_OUTCOME_EVENT_TYPES,
@@ -17,8 +17,8 @@ from agent_journal.events import (
     VERIFICATION_EVENT_TYPE,
     normalize_event,
 )
-from agent_journal.git_context import event_context, get_git_context, get_head_commit_files
-from agent_journal.install import (
+from agentic_journal.git_context import event_context, get_git_context, get_head_commit_files
+from agentic_journal.install import (
     claude_mcp_snippet,
     codex_mcp_snippet,
     gemini_mcp_snippet,
@@ -27,9 +27,9 @@ from agent_journal.install import (
     install_shell_profile,
     install_wrappers,
 )
-from agent_journal.report import build_provider_coverage, classify_daily_work, render_daily_report
-from agent_journal.storage import read_events_for_date, read_events_for_session, write_event
-from agent_journal.web import run_web_server
+from agentic_journal.report import build_provider_coverage, classify_daily_work, render_daily_report
+from agentic_journal.storage import read_events_for_date, read_events_for_session, write_event
+from agentic_journal.web import run_web_server
 
 
 def _add_event_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
@@ -68,7 +68,7 @@ def _add_status_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
 
 def _add_doctor_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
-    parser = subparsers.add_parser("doctor", help="Audit Agent Journal setup and daily coverage")
+    parser = subparsers.add_parser("doctor", help="Audit Agentic Journal setup and daily coverage")
     parser.add_argument("--today", action="store_true")
     parser.add_argument("--date")
 
@@ -88,7 +88,7 @@ def _add_install_parser(subparsers: argparse._SubParsersAction[argparse.Argument
     install_sub = parser.add_subparsers(dest="install_target")
     install_sub.add_parser("wrappers", help="Install codex/claude/gemini wrappers")
     install_sub.add_parser("shell-profile", help="Add wrapper PATH setup to .zprofile and .zshrc")
-    install_sub.add_parser("agent-instructions", help="Add Agent Journal reporting rules to global agent instruction files")
+    install_sub.add_parser("agent-instructions", help="Add Agentic Journal reporting rules to global agent instruction files")
     git_hook = install_sub.add_parser("git-hook", help="Install post-commit hook into a repo")
     git_hook.add_argument("--repo", default=".")
     install_sub.add_parser("mcp-snippets", help="Print MCP config snippets")
@@ -108,7 +108,7 @@ def _add_guard_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agent-journal")
+    parser = argparse.ArgumentParser(prog="agentic-journal")
     subparsers = parser.add_subparsers(dest="command")
     _add_event_parser(subparsers)
     _add_report_parser(subparsers)
@@ -312,7 +312,7 @@ def _guard_fallback_event(args: argparse.Namespace) -> dict:
             "files_changed": git_context.get("changed_files") or [],
             "semantic": {"status": JOURNAL_MISSING_STATUS, "note": args.note},
             "evidence": {
-                "verification": "agent-journal guard session-end",
+                "verification": "agentic-journal guard session-end",
                 "verification_status": "failed",
             },
         }

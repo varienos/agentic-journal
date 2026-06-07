@@ -1,10 +1,10 @@
 # Contributing
 
-Thanks for helping improve Agent Journal.
+Thanks for helping improve Agentic Journal.
 
 ## Project Scope
 
-Agent Journal is a local-first, observer-first activity journal for AI coding
+Agentic Journal is a local-first, observer-first activity journal for AI coding
 agents. Contributions should preserve these boundaries:
 
 - Do not capture full prompt transcripts by default.

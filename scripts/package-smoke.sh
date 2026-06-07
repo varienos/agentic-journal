@@ -17,30 +17,30 @@ python3 -m venv "$VENV"
 "$PYTHON" -m pip install --no-cache-dir --upgrade pip >/dev/null
 "$PYTHON" -m pip install --no-cache-dir "$TMP_ROOT"/dist/*.whl >/dev/null
 
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" --help >/dev/null
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" web --help >/dev/null
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" doctor --date "$(date +%F)" >/dev/null
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type agent_start --agent codex --session-id PACKAGE-MISSING >/dev/null
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" guard session-end --agent codex --session-id PACKAGE-MISSING >/dev/null
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type agent_start --agent codex --session-id PACKAGE-SUMMARY >/dev/null
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" event --type session_summary --agent codex --session-id PACKAGE-SUMMARY --task PACKAGE-SMOKE --summary "packaged session summary" --outcome completed >/dev/null
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agent-journal" guard session-end --agent codex --session-id PACKAGE-SUMMARY >/dev/null
-test -x "$VENV/bin/agent-journal-mcp"
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agentic-journal" --help >/dev/null
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agentic-journal" web --help >/dev/null
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agentic-journal" doctor --date "$(date +%F)" >/dev/null
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agentic-journal" event --type agent_start --agent codex --session-id PACKAGE-MISSING >/dev/null
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agentic-journal" guard session-end --agent codex --session-id PACKAGE-MISSING >/dev/null
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agentic-journal" event --type agent_start --agent codex --session-id PACKAGE-SUMMARY >/dev/null
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agentic-journal" event --type session_summary --agent codex --session-id PACKAGE-SUMMARY --task PACKAGE-SMOKE --summary "packaged session summary" --outcome completed >/dev/null
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$VENV/bin/agentic-journal" guard session-end --agent codex --session-id PACKAGE-SUMMARY >/dev/null
+test -x "$VENV/bin/agentic-journal-mcp"
 
 "$PYTHON" - <<PY
-from agent_journal.web import build_events_payload, render_dashboard_html
+from agentic_journal.web import build_events_payload, render_dashboard_html
 
 payload = build_events_payload("$JOURNAL_HOME", "$(date +%F)")
 assert payload["summary"]["risky"] == 1
 assert payload["summary"]["session_summaries"] == 1
 assert any(session["summary"] == "packaged session summary" for session in payload["sessions"])
 html = render_dashboard_html()
-assert "Agent Journal Live" in html
+assert "Agentic Journal Live" in html
 assert "X-Agent-Journal-Token" in html
 PY
 
 "$PYTHON" - <<'PY'
-from agent_journal.mcp_server import create_mcp_server
+from agentic_journal.mcp_server import create_mcp_server
 
 server = create_mcp_server()
 expected = {
@@ -53,9 +53,9 @@ expected = {
 assert expected.issubset(set(server._tool_manager._tools))
 PY
 
-AGENT_JOURNAL_HOME="$JOURNAL_HOME" AGENT_JOURNAL_SESSION_ID="PACKAGE-MCP-SESSION" "$PYTHON" - <<'PY'
-from agent_journal.mcp_server import journal_task_completed
-from agent_journal.storage import read_events_for_date
+AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" AGENTIC_JOURNAL_SESSION_ID="PACKAGE-MCP-SESSION" "$PYTHON" - <<'PY'
+from agentic_journal.mcp_server import journal_task_completed
+from agentic_journal.storage import read_events_for_date
 
 journal_task_completed(agent="claude", task_id="PACKAGE-MCP", note="packaged MCP context")
 events = read_events_for_date(None, None)
@@ -65,9 +65,9 @@ assert claim["cwd"]
 PY
 
 "$PYTHON" - <<PY
-from agent_journal.events import normalize_event
-from agent_journal.storage import write_event
-from agent_journal.web import create_web_handler
+from agentic_journal.events import normalize_event
+from agentic_journal.storage import write_event
+from agentic_journal.web import create_web_handler
 from http.server import ThreadingHTTPServer
 import http.client
 import json
@@ -102,18 +102,18 @@ PY
 
 mkdir -p "$TMP_ROOT/hook-repo"
 git -C "$TMP_ROOT/hook-repo" init >/dev/null
-AGENT_JOURNAL_HOME="$TMP_ROOT/hook-journal" \
-  "$VENV/bin/agent-journal" install git-hook --repo "$TMP_ROOT/hook-repo" >"$TMP_ROOT/install-git-hook.out"
+AGENTIC_JOURNAL_HOME="$TMP_ROOT/hook-journal" \
+  "$VENV/bin/agentic-journal" install git-hook --repo "$TMP_ROOT/hook-repo" >"$TMP_ROOT/install-git-hook.out"
 test -x "$TMP_ROOT/hook-repo/.git/hooks/post-commit"
-grep -q "agent-journal event --type git_commit" "$TMP_ROOT/hook-repo/.git/hooks/post-commit"
+grep -q "agentic-journal event --type git_commit" "$TMP_ROOT/hook-repo/.git/hooks/post-commit"
 
-HOME="$TMP_ROOT/home" AGENT_JOURNAL_HOME="$TMP_ROOT/profile-journal" \
-  "$VENV/bin/agent-journal" install shell-profile >"$TMP_ROOT/install-shell-profile.out"
-grep -q "agent-journal wrappers" "$TMP_ROOT/home/.zprofile"
-grep -q "agent-journal wrappers" "$TMP_ROOT/home/.zshrc"
+HOME="$TMP_ROOT/home" AGENTIC_JOURNAL_HOME="$TMP_ROOT/profile-journal" \
+  "$VENV/bin/agentic-journal" install shell-profile >"$TMP_ROOT/install-shell-profile.out"
+grep -q "agentic-journal wrappers" "$TMP_ROOT/home/.zprofile"
+grep -q "agentic-journal wrappers" "$TMP_ROOT/home/.zshrc"
 
-HOME="$TMP_ROOT/home" AGENT_JOURNAL_HOME="$TMP_ROOT/profile-journal" \
-  "$VENV/bin/agent-journal" install agent-instructions >"$TMP_ROOT/install-agent-instructions.out"
+HOME="$TMP_ROOT/home" AGENTIC_JOURNAL_HOME="$TMP_ROOT/profile-journal" \
+  "$VENV/bin/agentic-journal" install agent-instructions >"$TMP_ROOT/install-agent-instructions.out"
 grep -q "journal_session_summary" "$TMP_ROOT/home/.codex/AGENTS.md"
 grep -q "journal_session_summary" "$TMP_ROOT/home/.claude/CLAUDE.md"
 grep -q "journal_session_summary" "$TMP_ROOT/home/.gemini/GEMINI.md"
@@ -126,8 +126,8 @@ SH
 chmod +x "$TMP_ROOT/real/codex"
 
 PATH="$TMP_ROOT/real:$VENV/bin:$PATH" \
-  AGENT_JOURNAL_HOME="$JOURNAL_HOME" \
-  "$VENV/bin/agent-journal" install wrappers >"$TMP_ROOT/install-wrappers.out"
+  AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" \
+  "$VENV/bin/agentic-journal" install wrappers >"$TMP_ROOT/install-wrappers.out"
 test -x "$JOURNAL_HOME/bin/codex"
 
 if grep -q "scripts/wrappers" "$JOURNAL_HOME/bin/codex"; then
@@ -136,7 +136,7 @@ if grep -q "scripts/wrappers" "$JOURNAL_HOME/bin/codex"; then
 fi
 
 set +e
-PATH="$VENV/bin:$PATH" AGENT_JOURNAL_HOME="$JOURNAL_HOME" "$JOURNAL_HOME/bin/codex"
+PATH="$VENV/bin:$PATH" AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" "$JOURNAL_HOME/bin/codex"
 WRAPPER_STATUS=$?
 set -e
 test "$WRAPPER_STATUS" -eq 7
@@ -161,11 +161,11 @@ assert any(
 PY
 
 set +e
-PATH="/usr/bin:/bin" AGENT_JOURNAL_HOME="$TMP_ROOT/missing-path-journal" \
+PATH="/usr/bin:/bin" AGENTIC_JOURNAL_HOME="$TMP_ROOT/missing-path-journal" \
   "$JOURNAL_HOME/bin/codex" 2>"$TMP_ROOT/missing-path.err"
 MISSING_PATH_STATUS=$?
 set -e
 test "$MISSING_PATH_STATUS" -eq 7
-grep -q "agent-journal command not found" "$TMP_ROOT/missing-path.err"
+grep -q "agentic-journal command not found" "$TMP_ROOT/missing-path.err"
 
-echo "agent-journal package smoke passed"
+echo "agentic-journal package smoke passed"

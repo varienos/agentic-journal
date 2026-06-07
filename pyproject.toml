@@ -1,5 +1,5 @@
 [project]
-name = "agent-journal"
+name = "agentic-journal"
 version = "0.1.0"
 description = "Local observer-first activity journal for AI coding agents."
 readme = "README.md"
@@ -20,13 +20,13 @@ classifiers = [
 ]
 
 [project.urls]
-Repository = "https://github.com/varienos/agent-journal"
-Documentation = "https://github.com/varienos/agent-journal/tree/main/docs"
-Issues = "https://github.com/varienos/agent-journal/issues"
+Repository = "https://github.com/varienos/agentic-journal"
+Documentation = "https://github.com/varienos/agentic-journal/tree/main/docs"
+Issues = "https://github.com/varienos/agentic-journal/issues"
 
 [project.scripts]
-agent-journal = "agent_journal.cli:entrypoint"
-agent-journal-mcp = "agent_journal.mcp_server:main"
+agentic-journal = "agentic_journal.cli:entrypoint"
+agentic-journal-mcp = "agentic_journal.mcp_server:main"
 
 [dependency-groups]
 dev = [
@@ -38,7 +38,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_journal"]
+packages = ["src/agentic_journal"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

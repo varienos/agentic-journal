@@ -1,8 +1,8 @@
-# Agent Journal Improvement Plan
+# Agentic Journal Improvement Plan
 
 ## Scope
 
-Agent Journal should stay local-first and observer-first. The project should not
+Agentic Journal should stay local-first and observer-first. The project should not
 capture full prompt transcripts by default, should not become a general task
 manager, and should avoid pretending that an agent completed work without a
 semantic journal entry or verification evidence.
