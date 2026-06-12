@@ -1,4 +1,5 @@
 import pytest
+from pathlib import Path
 
 from agentic_journal import storage
 from agentic_journal.config import journal_root
@@ -192,3 +193,105 @@ def test_read_jsonl_events_skips_corrupt_lines(tmp_path):
     events = list(read_jsonl_events(path))
 
     assert events == [{"event_id": "ok", "event_type": "agent_start"}]
+
+
+def _write_project_config(project):
+    config_path = project / ".agentic-journal.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[project]",
+                'id = "cortex"',
+                'path = "."',
+                "",
+                "[mirror]",
+                "enabled = true",
+                'path = "Agentbase/.agentic-journal"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def test_write_event_mirrors_matching_project_event(tmp_path):
+    global_root = tmp_path / "global"
+    project = tmp_path / "cortex"
+    agentbase = project / "Agentbase"
+    agentbase.mkdir(parents=True)
+    _write_project_config(project)
+    event = _event("cortex-1", cwd=str(agentbase), repo=None)
+
+    write_event(global_root, event)
+
+    mirror_root = agentbase / ".agentic-journal"
+    assert [item["event_id"] for item in read_events_for_date(global_root, "2026-05-31")] == ["cortex-1"]
+    assert [item["event_id"] for item in read_events_for_date(mirror_root, "2026-05-31")] == ["cortex-1"]
+
+
+def test_write_event_mirrors_child_repo_project_event(tmp_path):
+    global_root = tmp_path / "global"
+    project = tmp_path / "cortex"
+    codebase = project / "Codebase" / "Cortex"
+    agentbase = project / "Agentbase"
+    codebase.mkdir(parents=True)
+    agentbase.mkdir(parents=True)
+    _write_project_config(project)
+    event = _event("cortex-2", cwd=str(codebase), repo=str(codebase))
+
+    write_event(global_root, event)
+
+    mirror_root = agentbase / ".agentic-journal"
+    assert [item["event_id"] for item in read_events_for_date(mirror_root, "2026-05-31")] == ["cortex-2"]
+
+
+def test_write_event_does_not_mirror_non_matching_project_event(tmp_path):
+    global_root = tmp_path / "global"
+    project = tmp_path / "cortex"
+    other = tmp_path / "other"
+    (project / "Agentbase").mkdir(parents=True)
+    other.mkdir()
+    _write_project_config(project)
+
+    write_event(global_root, _event("other-1", cwd=str(other), repo=None))
+
+    mirror_root = project / "Agentbase" / ".agentic-journal"
+    assert read_events_for_date(mirror_root, "2026-05-31") == []
+
+
+def test_write_event_keeps_project_mirror_idempotent(tmp_path):
+    global_root = tmp_path / "global"
+    project = tmp_path / "cortex"
+    agentbase = project / "Agentbase"
+    agentbase.mkdir(parents=True)
+    _write_project_config(project)
+    event = _event("cortex-duplicate", cwd=str(agentbase), repo=None)
+
+    write_event(global_root, event)
+    write_event(global_root, event)
+
+    mirror_root = agentbase / ".agentic-journal"
+    assert [item["event_id"] for item in read_events_for_date(mirror_root, "2026-05-31")] == ["cortex-duplicate"]
+    assert list(read_jsonl_events(mirror_root / "events" / "2026-05-31.jsonl")) == [event]
+
+
+def test_project_mirror_append_failure_does_not_fail_global_write(tmp_path, monkeypatch, capsys):
+    global_root = tmp_path / "global"
+    project = tmp_path / "cortex"
+    agentbase = project / "Agentbase"
+    agentbase.mkdir(parents=True)
+    _write_project_config(project)
+    real_append = storage.append_jsonl_event
+
+    def fail_mirror_append(root, event):
+        if Path(root) == agentbase / ".agentic-journal":
+            raise OSError("mirror unavailable")
+        return real_append(root, event)
+
+    monkeypatch.setattr(storage, "append_jsonl_event", fail_mirror_append)
+
+    write_event(global_root, _event("global-survives", cwd=str(agentbase), repo=None))
+
+    assert [item["event_id"] for item in read_events_for_date(global_root, "2026-05-31")] == ["global-survives"]
+    assert "failed to mirror Agentic Journal event" in capsys.readouterr().err

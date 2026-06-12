@@ -27,8 +27,9 @@ from agentic_journal.install import (
     install_shell_profile,
     install_wrappers,
 )
+from agentic_journal.project_config import event_matches_project, load_project_config
 from agentic_journal.report import build_provider_coverage, classify_daily_work, render_daily_report
-from agentic_journal.storage import read_events_for_date, read_events_for_session, write_event
+from agentic_journal.storage import persist_event, read_events_for_date, read_events_for_session, write_event
 from agentic_journal.web import run_web_server
 
 
@@ -54,6 +55,7 @@ def _add_event_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
 
 def _add_report_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("report", help="Generate a daily report")
+    parser.add_argument("--root", help="Read and write reports from this journal root")
     parser.add_argument("--today", action="store_true")
     parser.add_argument("--date")
     parser.add_argument("--print", action="store_true", dest="print_report")
@@ -63,18 +65,21 @@ def _add_report_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 
 def _add_status_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("status", help="Print a compact daily status")
+    parser.add_argument("--root", help="Read events from this journal root")
     parser.add_argument("--today", action="store_true")
     parser.add_argument("--date")
 
 
 def _add_doctor_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("doctor", help="Audit Agentic Journal setup and daily coverage")
+    parser.add_argument("--root", help="Read events from this journal root")
     parser.add_argument("--today", action="store_true")
     parser.add_argument("--date")
 
 
 def _add_web_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
     parser = subparsers.add_parser("web", help="Run the live web dashboard")
+    parser.add_argument("--root", help="Serve events from this journal root")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--today", action="store_true")
@@ -107,6 +112,17 @@ def _add_guard_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
     )
 
 
+def _add_mirror_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    parser = subparsers.add_parser("mirror", help="Manage project-local journal mirrors")
+    mirror_sub = parser.add_subparsers(dest="mirror_target")
+    sync = mirror_sub.add_parser("sync", help="Backfill matching events into a project mirror")
+    sync.add_argument("--root", help="Source journal root; defaults to the global journal")
+    sync.add_argument("--config", required=True, help="Path to the project's .agentic-journal.toml")
+    sync.add_argument("--date", help="Only sync events for this YYYY-MM-DD date")
+    sync.add_argument("--from", dest="date_from", help="Only sync events on or after this YYYY-MM-DD date")
+    sync.add_argument("--to", dest="date_to", help="Only sync events on or before this YYYY-MM-DD date")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="agentic-journal")
     subparsers = parser.add_subparsers(dest="command")
@@ -117,6 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_web_parser(subparsers)
     _add_install_parser(subparsers)
     _add_guard_parser(subparsers)
+    _add_mirror_parser(subparsers)
     return parser
 
 
@@ -180,15 +197,21 @@ def _report_date(args: argparse.Namespace) -> str:
     return datetime.now().astimezone().date().isoformat()
 
 
+def _root_from_args(args: argparse.Namespace) -> Path:
+    root = getattr(args, "root", None)
+    return Path(root).expanduser() if root else journal_root()
+
+
 def _handle_report(args: argparse.Namespace) -> int:
     date = _report_date(args)
-    resolved_date, markdown, _ = render_daily_report(journal_root(), date)
+    root = _root_from_args(args)
+    resolved_date, markdown, _ = render_daily_report(root, date)
     if args.output:
         output = Path(args.output).expanduser()
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(markdown, encoding="utf-8")
     else:
-        output = secure_dir(journal_root() / "reports") / f"{resolved_date}.md"
+        output = secure_dir(root / "reports") / f"{resolved_date}.md"
         output.write_text(markdown, encoding="utf-8")
         secure_file(output)
     if args.print_report:
@@ -200,7 +223,7 @@ def _handle_report(args: argparse.Namespace) -> int:
 
 def _handle_status(args: argparse.Namespace) -> int:
     date = _report_date(args)
-    events = read_events_for_date(journal_root(), date)
+    events = read_events_for_date(_root_from_args(args), date)
     classified = classify_daily_work(events)
     print(f"Date: {date}")
     print(f"Raw events: {len(events)}")
@@ -222,7 +245,7 @@ def _handle_status(args: argparse.Namespace) -> int:
 
 def _handle_doctor(args: argparse.Namespace) -> int:
     date = _report_date(args)
-    result = build_doctor_result(journal_root(), date)
+    result = build_doctor_result(_root_from_args(args), date)
     print(build_doctor_report(result), end="")
     return 0
 
@@ -230,7 +253,7 @@ def _handle_doctor(args: argparse.Namespace) -> int:
 def _handle_web(args: argparse.Namespace) -> int:
     try:
         run_web_server(
-            journal_root(),
+            _root_from_args(args),
             args.host,
             args.port,
             args.date,
@@ -241,6 +264,47 @@ def _handle_web(args: argparse.Namespace) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     return 0
+
+
+def _event_date(event: dict) -> str:
+    return str(event.get("ts", ""))[:10]
+
+
+def _event_within_sync_range(event: dict, args: argparse.Namespace) -> bool:
+    event_date = _event_date(event)
+    if args.date and event_date != args.date:
+        return False
+    if args.date_from and event_date < args.date_from:
+        return False
+    if args.date_to and event_date > args.date_to:
+        return False
+    return True
+
+
+def _handle_mirror(args: argparse.Namespace) -> int:
+    if args.mirror_target == "sync":
+        source_root = _root_from_args(args)
+        config = load_project_config(args.config)
+        events = read_events_for_date(source_root, args.date if args.date else None)
+        scanned = len(events)
+        matched = 0
+        inserted = 0
+        duplicates = 0
+        for event in events:
+            if not _event_within_sync_range(event, args):
+                continue
+            if not event_matches_project(config, event):
+                continue
+            matched += 1
+            _, was_inserted = persist_event(config.mirror_root, event)
+            if was_inserted:
+                inserted += 1
+            else:
+                duplicates += 1
+        print(f"scanned={scanned} matched={matched} inserted={inserted} duplicates={duplicates}")
+        return 0
+    print("Choose a mirror target: sync", file=sys.stderr)
+    return 2
 
 
 def _handle_install(args: argparse.Namespace) -> int:
@@ -356,6 +420,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _handle_install(args)
     if args.command == "guard":
         return _handle_guard(args)
+    if args.command == "mirror":
+        return _handle_mirror(args)
     parser.print_help()
     return 0
 

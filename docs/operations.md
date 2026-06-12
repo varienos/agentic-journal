@@ -229,6 +229,69 @@ The MVP semantic tools are:
 
 MCP responses are intentionally short to preserve model context.
 
+## Project-Local Mirrors
+
+Use project-local mirrors when a repo or container needs a scoped view of the
+global Agentic Journal. The global journal still receives every event first.
+Enabled mirror configs receive a copy only when the event `cwd` or `repo` is the
+configured project path or one of its children.
+
+Create a project config. For Cortex:
+
+```toml
+# /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml
+[project]
+id = "cortex"
+path = "/Users/varienos/Landing/Repo/cortex"
+
+[mirror]
+enabled = true
+path = "Agentbase/.agentic-journal"
+```
+
+Backfill existing history from the global journal:
+
+```bash
+agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml
+```
+
+Useful variants:
+
+```bash
+agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml --date 2026-06-13
+agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml --from 2026-06-01 --to 2026-06-13
+```
+
+Confirm the mirror can be read:
+
+```bash
+agentic-journal status --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --today
+agentic-journal report --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --today --print
+```
+
+Serve the existing web dashboard from a mirror root:
+
+```bash
+agentic-journal web --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --host 127.0.0.1 --port 8765 --today
+```
+
+For containers, mount only the project mirror and point the consumer at that
+path. Cortex uses:
+
+```bash
+AGENTIC_JOURNAL_PROJECT_HOME=/Agentbase/.agentic-journal
+```
+
+The mirror directory should be ignored by git:
+
+```gitignore
+Agentbase/.agentic-journal/
+```
+
+Project mirrors contain the same semantic summaries, notes, paths, branches,
+commit hashes, and evidence metadata as the global journal. Treat a mounted
+mirror as sensitive project telemetry.
+
 ## Release Checklist
 
 Before tagging or sharing a build:

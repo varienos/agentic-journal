@@ -37,6 +37,7 @@ The project is intentionally local-first. Runtime data is stored under
 - Git post-commit hook installer
 - Daily Markdown report generation with verified, claimed, observed, and risky evidence levels
 - Live web dashboard with auto-refreshing event data and optional API token
+- Configurable project-local journal mirrors for repo-scoped dashboards and containers
 - `CHANGELOG.md` plus tag-driven GitHub release automation
 - JSONL and SQLite event storage
 
@@ -140,6 +141,56 @@ agentic-journal web --host 127.0.0.1 --port 8765 --today
 
 Open `http://127.0.0.1:8765`.
 
+## Project-Local Mirrors
+
+The global journal remains the source of truth, but a project can opt into a
+local mirror by adding `.agentic-journal.toml` at or above the project paths
+that agents work from. Matching events are written to both the global root and
+the configured mirror root.
+
+For Cortex:
+
+```toml
+# /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml
+[project]
+id = "cortex"
+path = "/Users/varienos/Landing/Repo/cortex"
+
+[mirror]
+enabled = true
+path = "Agentbase/.agentic-journal"
+```
+
+Relative `project.path` and `mirror.path` values resolve from the config file
+directory. The Cortex example writes to
+`/Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal`.
+
+Backfill existing history into the mirror:
+
+```bash
+agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml
+```
+
+Limit sync to a single date or date range when needed:
+
+```bash
+agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml --date 2026-06-13
+agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml --from 2026-06-01 --to 2026-06-13
+```
+
+Read a mirror root directly:
+
+```bash
+agentic-journal status --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --today
+agentic-journal report --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --today --print
+agentic-journal web --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --host 127.0.0.1 --port 8765 --today
+```
+
+Project mirrors contain the same summaries, notes, paths, branches, commit
+hashes, and evidence metadata as the global journal. Keep mirror directories
+out of git, and mount only the project mirror into containers that need the
+project panel.
+
 ## MCP Setup
 
 Print ready-to-copy MCP snippets for Codex, Claude Code, and Gemini CLI:
@@ -218,6 +269,9 @@ Agentic Journal writes each event to both:
 
 Duplicate `event_id` writes are ignored in both SQLite and the JSONL mirror so
 the two stores stay aligned.
+
+When a project mirror config matches an event `cwd` or `repo`, the same event is
+also written to that mirror root using the identical SQLite and JSONL layout.
 
 Reports are written to:
 

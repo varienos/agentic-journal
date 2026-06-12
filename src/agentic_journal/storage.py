@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import sys
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 from agentic_journal.config import ensure_config, journal_root, secure_dir, secure_file
 from agentic_journal.events import SCHEMA_VERSION
+from agentic_journal.project_config import discover_project_mirror_configs, event_matches_project
 
 
 def _date_from_ts(ts: str) -> str:
@@ -150,12 +152,12 @@ def delete_event(root: str | Path | None, event_id: str) -> None:
         conn.execute("DELETE FROM events WHERE event_id = ?", (event_id,))
 
 
-def write_event(root: str | Path | None, event: dict[str, Any]) -> Path:
+def persist_event(root: str | Path | None, event: dict[str, Any]) -> tuple[Path, bool]:
     root_path = Path(root).expanduser() if root else journal_root()
     path = root_path / "events" / f"{_date_from_ts(event['ts'])}.jsonl"
     if insert_event(root_path, event):
         try:
-            return append_jsonl_event(root_path, event)
+            return append_jsonl_event(root_path, event), True
         except OSError:
             # Keep SQLite (read path) and the JSONL mirror consistent: if the
             # mirror append fails, roll back the SQLite row so a retry re-attempts
@@ -168,6 +170,27 @@ def write_event(root: str | Path | None, event: dict[str, Any]) -> Path:
                 # actionable filesystem failure harder to diagnose.
                 pass
             raise
+    return path, False
+
+
+def _mirror_event_to_project_roots(event: dict[str, Any]) -> None:
+    for config in discover_project_mirror_configs(event):
+        if not event_matches_project(config, event):
+            continue
+        try:
+            persist_event(config.mirror_root, event)
+        except Exception as exc:
+            print(
+                f"failed to mirror Agentic Journal event {event.get('event_id')} "
+                f"to {config.mirror_root}: {exc}",
+                file=sys.stderr,
+            )
+
+
+def write_event(root: str | Path | None, event: dict[str, Any]) -> Path:
+    path, inserted = persist_event(root, event)
+    if inserted:
+        _mirror_event_to_project_roots(event)
     return path
 
 
