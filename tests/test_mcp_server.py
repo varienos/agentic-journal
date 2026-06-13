@@ -1,5 +1,6 @@
 import subprocess
 
+import agentic_journal.mcp_server as mcp_server
 from agentic_journal.mcp_server import (
     create_mcp_server,
     journal_note,
@@ -101,6 +102,45 @@ def test_journal_session_summary_skips_blank_summary(tmp_path):
     assert read_events_for_date(tmp_path, None) == []
 
 
+def test_journal_model_operation_writes_activity_event(tmp_path):
+    result = mcp_server.journal_model_operation(
+        journal_home=tmp_path,
+        agent="cortex",
+        session_id="chat-1",
+        provider="claude",
+        model="claude-opus-4-8-thinking-high",
+        operation="chat",
+        source="/api/chat",
+        status="completed",
+        duration_ms=1234,
+        input_tokens=1200,
+        output_tokens=340,
+        cached_input_tokens=100,
+        reasoning_tokens=50,
+        error_code="rate_limit",
+    )
+
+    assert result == "logged"
+    event = read_events_for_date(tmp_path, None)[0]
+    assert event["event_type"] == "model_operation"
+    assert event["semantic"] == {
+        "provider": "claude",
+        "model": "claude-opus-4-8-thinking-high",
+        "operation": "chat",
+        "source": "/api/chat",
+        "status": "completed",
+    }
+    assert event["evidence"]["token_usage"]["input_tokens"] == 1200
+    assert event["evidence"]["error_code"] == "rate_limit"
+
+
+def test_journal_model_operation_skips_without_metadata(tmp_path):
+    result = mcp_server.journal_model_operation(journal_home=tmp_path, agent="cortex")
+
+    assert result == "skipped: model operation metadata is required"
+    assert read_events_for_date(tmp_path, None) == []
+
+
 def test_mcp_tools_attach_session_and_git_context(tmp_path, monkeypatch):
     repo = tmp_path / "repo"
     head = _init_git_repo(repo)
@@ -117,9 +157,17 @@ def test_mcp_tools_attach_session_and_git_context(tmp_path, monkeypatch):
         summary="Implemented session summary logging",
         outcome="completed",
     )
+    mcp_server.journal_model_operation(
+        journal_home=tmp_path / "journal",
+        agent="cortex",
+        provider="claude",
+        model="claude-opus-4-8-thinking-high",
+        operation="chat",
+        status="completed",
+    )
 
     events = read_events_for_date(tmp_path / "journal", None)
-    assert [event["session_id"] for event in events] == ["session-env"] * 4
+    assert [event["session_id"] for event in events] == ["session-env"] * 5
     assert {event["repo"] for event in events} == {str(repo)}
     assert {event["branch"] for event in events} == {"main"}
     assert {event["commit"] for event in events} == {head}
@@ -156,5 +204,6 @@ def test_create_mcp_server_registers_expected_tool_names():
         "journal_session_summary",
         "journal_task_completed",
         "journal_task_blocked",
+        "journal_model_operation",
         "journal_daily_report",
     }.issubset(set(server._tool_manager._tools))

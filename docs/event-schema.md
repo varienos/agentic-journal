@@ -36,6 +36,22 @@ Outcome events:
 - `semantic.task_id` should be set when the session maps to a Backlog task or
   other stable task identifier.
 
+Model operation events:
+
+- `model_operation` records one model call or model-backed step from a project
+  runtime such as Cortex.
+- Store labels in `semantic`: provider, model, operation, source, and status.
+- Store measured facts in `evidence`: `token_usage` with numeric
+  `input_tokens`, `output_tokens`, `cached_input_tokens`,
+  `cache_creation_input_tokens`, or `reasoning_tokens`, plus `error_code` when
+  available.
+- Use top-level `duration_ms` for elapsed runtime and `session_id` for the
+  caller's correlation id when available.
+- `model_operation` events are reported under Model Activity. They are not
+  session outcome events and do not satisfy the session-end guard.
+- Never store prompts, completions, transcripts, or file contents in
+  `model_operation`.
+
 Correlation rules:
 
 - `commit` is the strongest verification key. A `git_commit` item is
@@ -101,3 +117,5 @@ Privacy rules:
   directories out of git and mount them only into trusted containers.
 - Free-text semantic fields are capped by `MAX_SEMANTIC_TEXT`; oversized
   `summary`, `note`, and `reason` values are truncated with `…[truncated]`.
+- Numeric `evidence.token_usage` values are preserved for model operation
+  reporting; secret-looking token keys such as API tokens are still redacted.

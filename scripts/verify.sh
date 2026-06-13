@@ -88,6 +88,7 @@ expected = {
     "journal_session_summary",
     "journal_task_completed",
     "journal_task_blocked",
+    "journal_model_operation",
     "journal_daily_report",
 }
 assert expected.issubset(set(server._tool_manager._tools))

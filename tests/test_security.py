@@ -14,6 +14,23 @@ def test_redacts_known_secret_keys():
     assert value["safe"] == "ok"
 
 
+def test_preserves_numeric_token_usage_metadata():
+    value = redact_value(
+        {
+            "evidence": {
+                "token_usage": {
+                    "input_tokens": 1200,
+                    "output_tokens": 340,
+                },
+                "api_token": "secret-value",
+            }
+        }
+    )
+
+    assert value["evidence"]["token_usage"] == {"input_tokens": 1200, "output_tokens": 340}
+    assert value["evidence"]["api_token"] == "[REDACTED]"
+
+
 def test_redacts_bearer_tokens_in_strings():
     value = redact_value("Authorization: Bearer abcdef123456")
 

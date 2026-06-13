@@ -225,6 +225,7 @@ The MVP semantic tools are:
 - `journal_session_summary`
 - `journal_task_completed`
 - `journal_task_blocked`
+- `journal_model_operation`
 - `journal_daily_report`
 
 MCP responses are intentionally short to preserve model context.

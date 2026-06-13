@@ -45,10 +45,21 @@ def _add_event_parser(subparsers: argparse._SubParsersAction[argparse.ArgumentPa
         choices=["completed", "in_progress", "blocked", "no_work", "unknown"],
     )
     parser.add_argument("--reason")
+    parser.add_argument("--provider")
+    parser.add_argument("--model")
+    parser.add_argument("--operation")
+    parser.add_argument("--source")
+    parser.add_argument("--status")
     parser.add_argument("--session-id")
     parser.add_argument("--command", dest="agent_command")
     parser.add_argument("--exit-code", type=int)
     parser.add_argument("--duration-ms", type=int)
+    parser.add_argument("--input-tokens", type=int)
+    parser.add_argument("--output-tokens", type=int)
+    parser.add_argument("--cached-input-tokens", type=int)
+    parser.add_argument("--cache-creation-input-tokens", type=int)
+    parser.add_argument("--reasoning-tokens", type=int)
+    parser.add_argument("--error-code")
     parser.add_argument("--verification")
     parser.add_argument("--verification-status", choices=["passed", "failed"])
 
@@ -151,6 +162,16 @@ def _event_from_args(args: argparse.Namespace) -> dict:
         semantic["outcome"] = args.outcome
     if args.reason:
         semantic["reason"] = args.reason
+    if args.provider:
+        semantic["provider"] = args.provider
+    if args.model:
+        semantic["model"] = args.model
+    if args.operation:
+        semantic["operation"] = args.operation
+    if args.source:
+        semantic["source"] = args.source
+    if args.status:
+        semantic["status"] = args.status
     if args.event_type == TASK_COMPLETED_CLAIM_EVENT_TYPE:
         semantic["status"] = "completed_claimed"
     if args.event_type == TASK_BLOCKED_EVENT_TYPE:
@@ -161,6 +182,21 @@ def _event_from_args(args: argparse.Namespace) -> dict:
         evidence["verification"] = args.verification
     if args.verification_status:
         evidence["verification_status"] = args.verification_status
+    token_usage = {
+        key: value
+        for key, value in {
+            "input_tokens": args.input_tokens,
+            "output_tokens": args.output_tokens,
+            "cached_input_tokens": args.cached_input_tokens,
+            "cache_creation_input_tokens": args.cache_creation_input_tokens,
+            "reasoning_tokens": args.reasoning_tokens,
+        }.items()
+        if value is not None
+    }
+    if token_usage:
+        evidence["token_usage"] = token_usage
+    if args.error_code:
+        evidence["error_code"] = args.error_code
 
     files_changed = git_context.get("changed_files") or []
     if args.event_type == GIT_COMMIT_EVENT_TYPE:
@@ -230,6 +266,7 @@ def _handle_status(args: argparse.Namespace) -> int:
     print(f"Completed verified: {len(classified['completed_verified'])}")
     print(f"Completed claimed: {len(classified['completed_claimed'])}")
     print(f"Session summaries: {len(classified['session_summaries'])}")
+    print(f"Model activity: {len(classified['model_activity'])}")
     print(f"In progress: {len(classified['in_progress'])}")
     print(f"Blocked: {len(classified['blocked'])}")
     print(f"Notes: {len(classified['notes'])}")

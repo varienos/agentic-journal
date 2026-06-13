@@ -18,6 +18,7 @@ the day in a style close to git history:
 
 - session starts and ends from wrapped agent commands
 - explicit session summaries and semantic notes from MCP tools
+- model operation activity emitted by project runtimes without prompt bodies
 - claimed completed tasks, blocked tasks, and verification evidence
 - git commit metadata and changed files
 - risky sessions that ended without a semantic journal entry
@@ -121,6 +122,24 @@ agentic-journal event --type session_summary --agent codex \
   --outcome completed
 ```
 
+Record a model operation from a runtime integration:
+
+```bash
+agentic-journal event --type model_operation --agent cortex \
+  --session-id chat-1 \
+  --provider claude \
+  --model claude-opus-4-8-thinking-high \
+  --operation chat \
+  --source /api/chat \
+  --status completed \
+  --duration-ms 1234 \
+  --input-tokens 1200 \
+  --output-tokens 340
+```
+
+`model_operation` is metadata-only. Do not store prompts, completions,
+transcripts, or file contents in these events.
+
 Generate today's report:
 
 ```bash
@@ -211,6 +230,7 @@ Available MCP tools:
 - `journal_session_summary`
 - `journal_task_completed`
 - `journal_task_blocked`
+- `journal_model_operation`
 - `journal_daily_report`
 
 MCP writes inherit `AGENTIC_JOURNAL_SESSION_ID` when present and attach the

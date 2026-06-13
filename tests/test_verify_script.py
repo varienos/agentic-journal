@@ -13,6 +13,7 @@ def test_verify_script_declares_ci_smoke_checks():
     assert "agentic-journal web --help" in text
     assert "session_summary" in text
     assert "journal_session_summary" in text
+    assert "journal_model_operation" in text
     assert "X-Agent-Journal-Token" in text
     assert "api_token=\"secret\"" in text
     assert "guard session-end" in text

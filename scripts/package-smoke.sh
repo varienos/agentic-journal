@@ -48,19 +48,32 @@ expected = {
     "journal_session_summary",
     "journal_task_completed",
     "journal_task_blocked",
+    "journal_model_operation",
     "journal_daily_report",
 }
 assert expected.issubset(set(server._tool_manager._tools))
 PY
 
 AGENTIC_JOURNAL_HOME="$JOURNAL_HOME" AGENTIC_JOURNAL_SESSION_ID="PACKAGE-MCP-SESSION" "$PYTHON" - <<'PY'
-from agentic_journal.mcp_server import journal_task_completed
+from agentic_journal.mcp_server import journal_model_operation, journal_task_completed
 from agentic_journal.storage import read_events_for_date
 
 journal_task_completed(agent="claude", task_id="PACKAGE-MCP", note="packaged MCP context")
+journal_model_operation(
+    agent="cortex",
+    provider="claude",
+    model="claude-opus-4-8-thinking-high",
+    operation="package-smoke",
+    status="completed",
+    input_tokens=1,
+    output_tokens=1,
+)
 events = read_events_for_date(None, None)
 claim = [event for event in events if event["event_type"] == "task_completed_claim"][-1]
+model_operation = [event for event in events if event["event_type"] == "model_operation"][-1]
 assert claim["session_id"] == "PACKAGE-MCP-SESSION"
+assert model_operation["session_id"] == "PACKAGE-MCP-SESSION"
+assert model_operation["evidence"]["token_usage"] == {"input_tokens": 1, "output_tokens": 1}
 assert claim["cwd"]
 PY
 

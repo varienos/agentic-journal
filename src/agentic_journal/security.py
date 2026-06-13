@@ -11,6 +11,13 @@ SECRET_KEY_RE = re.compile(
     r"(api[_-]?key|account[_-]?key|token|secret|password|passwd|authorization|credential|private[_-]?key)",
     re.IGNORECASE,
 )
+TOKEN_USAGE_KEYS = {
+    "input_tokens",
+    "output_tokens",
+    "cached_input_tokens",
+    "cache_creation_input_tokens",
+    "reasoning_tokens",
+}
 
 # Secret-named assignments: `API_KEY=...`, `DB_PASSWORD: "..."`, `AccountKey=...`.
 # The value group is quote-aware and stops at common delimiters (& ; , whitespace)
@@ -84,14 +91,29 @@ def _redact_string(value: str) -> str:
     return value
 
 
+def _is_safe_token_usage(key: str, value: Any) -> bool:
+    if key.lower().replace("-", "_") != "token_usage" or not isinstance(value, Mapping):
+        return False
+    return all(
+        str(child_key) in TOKEN_USAGE_KEYS
+        and isinstance(child_value, int)
+        and not isinstance(child_value, bool)
+        for child_key, child_value in value.items()
+    )
+
+
 def redact_value(value: Any) -> Any:
     if isinstance(value, Mapping):
         redacted: dict[str, Any] = {}
         for key, item in value.items():
-            if SECRET_KEY_RE.search(str(key)):
-                redacted[str(key)] = REDACTED
+            key_text = str(key)
+            if SECRET_KEY_RE.search(key_text):
+                if _is_safe_token_usage(key_text, item):
+                    redacted[key_text] = {str(child_key): child_value for child_key, child_value in item.items()}
+                    continue
+                redacted[key_text] = REDACTED
             else:
-                redacted[str(key)] = redact_value(item)
+                redacted[key_text] = redact_value(item)
         return redacted
     if isinstance(value, list):
         return [redact_value(item) for item in value]

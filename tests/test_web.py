@@ -65,6 +65,24 @@ def test_build_events_payload_returns_summary_and_latest_events(tmp_path):
     write_event(
         tmp_path,
         _event(
+            "model_operation",
+            ts="2026-06-01T10:00:45+03:00",
+            session_id="chat-1",
+            agent="cortex",
+            repo="/repo",
+            semantic={
+                "provider": "claude",
+                "model": "claude-opus-4-8-thinking-high",
+                "operation": "chat",
+                "source": "/api/chat",
+                "status": "completed",
+            },
+            evidence={"token_usage": {"input_tokens": 1200, "output_tokens": 340}},
+        ),
+    )
+    write_event(
+        tmp_path,
+        _event(
             "verification",
             ts="2026-06-01T10:01:00+03:00",
             session_id="missing-1",
@@ -76,15 +94,18 @@ def test_build_events_payload_returns_summary_and_latest_events(tmp_path):
     payload = build_events_payload(tmp_path, "2026-06-01")
 
     assert payload["date"] == "2026-06-01"
-    assert payload["raw_event_count"] == 4
+    assert payload["raw_event_count"] == 5
     assert payload["summary"]["session_summaries"] == 1
+    assert payload["summary"]["model_activity"] == 1
     assert payload["summary"]["in_progress"] == 0
     assert payload["summary"]["notes"] == 1
     assert payload["summary"]["risky"] == 1
     assert payload["provider_coverage"]["codex"]["coverage_percent"] == 100
     assert payload["provider_coverage"]["claude"]["missing"] == 1
     assert payload["latest_events"][0]["event_type"] == "verification"
-    assert payload["latest_events"][1]["event_type"] == "session_summary"
+    assert payload["latest_events"][1]["event_type"] == "model_operation"
+    assert payload["latest_events"][1]["semantic"]["provider"] == "claude"
+    assert payload["latest_events"][1]["evidence"]["token_usage"]["output_tokens"] == 340
     session = next(item for item in payload["sessions"] if item["session_id"] == "summary-1")
     assert session["summary"] == "Implemented session summary logging"
     assert session["outcome"] == "completed"
@@ -111,10 +132,12 @@ def test_render_dashboard_html_contains_live_dashboard_controls():
     assert "X-Agent-Journal-Token" in html
     assert "setInterval" in html
     assert "Session Summaries" in html
+    assert "Model Activity" in html
     assert "Provider Coverage" in html
     assert "Likely cause" in html
     assert "data-section=\"sessions\"" in html
     assert "data-section=\"notes\"" in html
+    assert "data-section=\"model_activity\"" in html
     assert "data-section=\"risky\"" in html
     assert "2026-06-01" in html
 

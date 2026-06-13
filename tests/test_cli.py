@@ -87,6 +87,92 @@ def test_event_command_writes_session_summary_fields(tmp_path, monkeypatch):
     assert event["semantic"]["outcome"] == "completed"
 
 
+def test_event_command_writes_model_operation_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
+
+    exit_code = main(
+        [
+            "event",
+            "--type",
+            "model_operation",
+            "--agent",
+            "cortex",
+            "--session-id",
+            "chat-1",
+            "--provider",
+            "claude",
+            "--model",
+            "claude-opus-4-8-thinking-high",
+            "--operation",
+            "chat",
+            "--source",
+            "/api/chat",
+            "--status",
+            "completed",
+            "--duration-ms",
+            "1234",
+            "--input-tokens",
+            "1200",
+            "--output-tokens",
+            "340",
+            "--cached-input-tokens",
+            "100",
+            "--reasoning-tokens",
+            "50",
+            "--error-code",
+            "rate_limit",
+        ]
+    )
+
+    assert exit_code == 0
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    event = json.loads(event_file.read_text().splitlines()[0])
+    assert event["event_type"] == "model_operation"
+    assert event["agent"] == "cortex"
+    assert event["session_id"] == "chat-1"
+    assert event["duration_ms"] == 1234
+    assert event["semantic"] == {
+        "provider": "claude",
+        "model": "claude-opus-4-8-thinking-high",
+        "operation": "chat",
+        "source": "/api/chat",
+        "status": "completed",
+    }
+    assert event["evidence"]["token_usage"] == {
+        "input_tokens": 1200,
+        "output_tokens": 340,
+        "cached_input_tokens": 100,
+        "reasoning_tokens": 50,
+    }
+    assert event["evidence"]["error_code"] == "rate_limit"
+
+
+def test_status_command_prints_model_activity_count(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
+    main(
+        [
+            "event",
+            "--type",
+            "model_operation",
+            "--agent",
+            "cortex",
+            "--provider",
+            "claude",
+            "--model",
+            "claude-opus-4-8-thinking-high",
+            "--operation",
+            "workflow.step",
+            "--status",
+            "completed",
+        ]
+    )
+
+    exit_code = main(["status", "--today"])
+
+    assert exit_code == 0
+    assert "Model activity: 1" in capsys.readouterr().out
+
+
 def test_report_command_writes_markdown(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
     main(["event", "--type", "task_completed_claim", "--agent", "codex", "--task", "TASK-1"])

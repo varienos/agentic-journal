@@ -16,6 +16,7 @@ SEMANTIC_NOTE_EVENT_TYPE = "semantic_note"
 SESSION_SUMMARY_EVENT_TYPE = "session_summary"
 TASK_COMPLETED_CLAIM_EVENT_TYPE = "task_completed_claim"
 TASK_BLOCKED_EVENT_TYPE = "task_blocked"
+MODEL_OPERATION_EVENT_TYPE = "model_operation"
 
 ALLOWED_EVENT_TYPES = {
     AGENT_START_EVENT_TYPE,
@@ -26,6 +27,7 @@ ALLOWED_EVENT_TYPES = {
     SESSION_SUMMARY_EVENT_TYPE,
     TASK_COMPLETED_CLAIM_EVENT_TYPE,
     TASK_BLOCKED_EVENT_TYPE,
+    MODEL_OPERATION_EVENT_TYPE,
 }
 
 # Single source of truth for the event-type subsets used across the codebase.

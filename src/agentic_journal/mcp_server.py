@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from agentic_journal.events import (
+    MODEL_OPERATION_EVENT_TYPE,
     SEMANTIC_NOTE_EVENT_TYPE,
     SESSION_SUMMARY_EVENT_TYPE,
     TASK_BLOCKED_EVENT_TYPE,
@@ -17,6 +18,7 @@ SKIPPED_NOTE_REQUIRED = "skipped: note is required"
 SKIPPED_SUMMARY_REQUIRED = "skipped: summary is required"
 SKIPPED_TASK_OR_NOTE_REQUIRED = "skipped: task_id or note is required"
 SKIPPED_REASON_REQUIRED = "skipped: reason is required"
+SKIPPED_MODEL_OPERATION_METADATA_REQUIRED = "skipped: model operation metadata is required"
 
 
 def _clean_text(value: str | None) -> str:
@@ -108,6 +110,71 @@ def journal_session_summary(
     return "logged"
 
 
+def _optional_int(value: int | None) -> int | None:
+    return value if isinstance(value, int) else None
+
+
+def journal_model_operation(
+    journal_home: str | Path | None = None,
+    agent: str = "unknown",
+    session_id: str | None = None,
+    provider: str = "",
+    model: str = "",
+    operation: str = "",
+    source: str = "",
+    status: str = "",
+    duration_ms: int | None = None,
+    input_tokens: int | None = None,
+    output_tokens: int | None = None,
+    cached_input_tokens: int | None = None,
+    cache_creation_input_tokens: int | None = None,
+    reasoning_tokens: int | None = None,
+    error_code: str = "",
+) -> str:
+    semantic = {
+        key: value
+        for key, value in {
+            "provider": _clean_text(provider),
+            "model": _clean_text(model),
+            "operation": _clean_text(operation),
+            "source": _clean_text(source),
+            "status": _clean_text(status),
+        }.items()
+        if value
+    }
+    token_usage = {
+        key: value
+        for key, value in {
+            "input_tokens": _optional_int(input_tokens),
+            "output_tokens": _optional_int(output_tokens),
+            "cached_input_tokens": _optional_int(cached_input_tokens),
+            "cache_creation_input_tokens": _optional_int(cache_creation_input_tokens),
+            "reasoning_tokens": _optional_int(reasoning_tokens),
+        }.items()
+        if value is not None
+    }
+    evidence = {}
+    if token_usage:
+        evidence["token_usage"] = token_usage
+    error_text = _clean_text(error_code)
+    if error_text:
+        evidence["error_code"] = error_text
+    if not semantic and not evidence and duration_ms is None:
+        return SKIPPED_MODEL_OPERATION_METADATA_REQUIRED
+    event = normalize_event(
+        {
+            "event_type": MODEL_OPERATION_EVENT_TYPE,
+            "agent": agent,
+            **_event_context(session_id),
+            "duration_ms": duration_ms,
+            "semantic": semantic,
+            "evidence": evidence,
+        }
+    )
+    write_event(journal_home, event)
+    return "logged"
+
+
 def journal_task_blocked(
     journal_home: str | Path | None = None,
     agent: str = "unknown",
@@ -193,6 +260,40 @@ def create_mcp_server():
         session_id: str = "",
     ) -> str:
         return journal_task_blocked(agent=agent, task_id=task_id, reason=reason, session_id=session_id or None)
+
+    @server.tool(name="journal_model_operation")
+    def journal_model_operation_tool(
+        agent: str = "unknown",
+        session_id: str = "",
+        provider: str = "",
+        model: str = "",
+        operation: str = "",
+        source: str = "",
+        status: str = "",
+        duration_ms: int | None = None,
+        input_tokens: int | None = None,
+        output_tokens: int | None = None,
+        cached_input_tokens: int | None = None,
+        cache_creation_input_tokens: int | None = None,
+        reasoning_tokens: int | None = None,
+        error_code: str = "",
+    ) -> str:
+        return journal_model_operation(
+            agent=agent,
+            session_id=session_id or None,
+            provider=provider,
+            model=model,
+            operation=operation,
+            source=source,
+            status=status,
+            duration_ms=duration_ms,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_input_tokens=cached_input_tokens,
+            cache_creation_input_tokens=cache_creation_input_tokens,
+            reasoning_tokens=reasoning_tokens,
+            error_code=error_code,
+        )
 
     @server.tool(name="journal_daily_report")
     def journal_daily_report_tool(date: str = "") -> str:

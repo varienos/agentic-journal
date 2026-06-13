@@ -68,6 +68,45 @@ def test_normalize_event_accepts_session_summary():
     assert event["semantic"]["outcome"] == "completed"
 
 
+def test_normalize_event_accepts_model_operation_metadata():
+    event = normalize_event(
+        {
+            "event_type": "model_operation",
+            "agent": "cortex",
+            "session_id": "chat-1",
+            "duration_ms": 1234,
+            "semantic": {
+                "provider": "claude",
+                "model": "claude-opus-4-8-thinking-high",
+                "operation": "chat",
+                "source": "/api/chat",
+                "status": "completed",
+            },
+            "evidence": {
+                "token_usage": {
+                    "input_tokens": 1200,
+                    "output_tokens": 340,
+                    "cached_input_tokens": 100,
+                    "reasoning_tokens": 50,
+                },
+                "error_code": "rate_limit",
+            },
+        }
+    )
+
+    assert event["event_type"] == "model_operation"
+    assert event["duration_ms"] == 1234
+    assert event["semantic"] == {
+        "provider": "claude",
+        "model": "claude-opus-4-8-thinking-high",
+        "operation": "chat",
+        "source": "/api/chat",
+        "status": "completed",
+    }
+    assert event["evidence"]["token_usage"]["input_tokens"] == 1200
+    assert event["evidence"]["error_code"] == "rate_limit"
+
+
 def test_normalize_event_accepts_valid_iso_ts():
     event = normalize_event(
         {"event_type": "agent_start", "agent": "codex", "ts": "2026-05-31T10:00:00+03:00"}
