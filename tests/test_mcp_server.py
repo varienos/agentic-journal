@@ -30,6 +30,13 @@ def test_journal_note_writes_semantic_note(tmp_path):
     assert events[0]["semantic"]["note"] == "Investigated TASK-1"
 
 
+def test_journal_note_skips_blank_note(tmp_path):
+    result = journal_note(journal_home=tmp_path, agent="codex", note="   ")
+
+    assert result == "skipped: note is required"
+    assert read_events_for_date(tmp_path, None) == []
+
+
 def test_journal_task_completed_writes_claim(tmp_path):
     result = journal_task_completed(journal_home=tmp_path, agent="claude", task_id="TASK-2", note="Done")
 
@@ -39,6 +46,13 @@ def test_journal_task_completed_writes_claim(tmp_path):
     assert events[0]["semantic"]["task_id"] == "TASK-2"
 
 
+def test_journal_task_completed_skips_without_task_or_note(tmp_path):
+    result = journal_task_completed(journal_home=tmp_path, agent="claude", task_id="", note="  ")
+
+    assert result == "skipped: task_id or note is required"
+    assert read_events_for_date(tmp_path, None) == []
+
+
 def test_journal_task_blocked_writes_blocked_event(tmp_path):
     result = journal_task_blocked(journal_home=tmp_path, agent="gemini", task_id="TASK-3", reason="Missing key")
 
@@ -46,6 +60,13 @@ def test_journal_task_blocked_writes_blocked_event(tmp_path):
     events = read_events_for_date(tmp_path, None)
     assert events[0]["event_type"] == "task_blocked"
     assert events[0]["semantic"]["status"] == "blocked"
+
+
+def test_journal_task_blocked_skips_blank_reason(tmp_path):
+    result = journal_task_blocked(journal_home=tmp_path, agent="gemini", task_id="TASK-3", reason=" ")
+
+    assert result == "skipped: reason is required"
+    assert read_events_for_date(tmp_path, None) == []
 
 
 def test_journal_session_summary_writes_outcome_event(tmp_path):
@@ -65,6 +86,19 @@ def test_journal_session_summary_writes_outcome_event(tmp_path):
     assert events[0]["semantic"]["task_id"] == "TASK-8"
     assert events[0]["semantic"]["summary"] == "Implemented session summary logging"
     assert events[0]["semantic"]["outcome"] == "completed"
+
+
+def test_journal_session_summary_skips_blank_summary(tmp_path):
+    result = journal_session_summary(
+        journal_home=tmp_path,
+        agent="codex",
+        session_id="session-1",
+        summary=" ",
+        outcome="completed",
+    )
+
+    assert result == "skipped: summary is required"
+    assert read_events_for_date(tmp_path, None) == []
 
 
 def test_mcp_tools_attach_session_and_git_context(tmp_path, monkeypatch):

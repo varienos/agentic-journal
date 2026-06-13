@@ -13,6 +13,15 @@ from agentic_journal.events import (
 from agentic_journal.git_context import event_context
 from agentic_journal.storage import write_event
 
+SKIPPED_NOTE_REQUIRED = "skipped: note is required"
+SKIPPED_SUMMARY_REQUIRED = "skipped: summary is required"
+SKIPPED_TASK_OR_NOTE_REQUIRED = "skipped: task_id or note is required"
+SKIPPED_REASON_REQUIRED = "skipped: reason is required"
+
+
+def _clean_text(value: str | None) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
 
 def _event_context(session_id: str | None = None) -> dict:
     return {
@@ -29,12 +38,15 @@ def journal_note(
     note: str = "",
     session_id: str | None = None,
 ) -> str:
+    note_text = _clean_text(note)
+    if not note_text:
+        return SKIPPED_NOTE_REQUIRED
     event = normalize_event(
         {
             "event_type": SEMANTIC_NOTE_EVENT_TYPE,
             "agent": agent,
             **_event_context(session_id),
-            "semantic": {"note": note},
+            "semantic": {"note": note_text},
         }
     )
     write_event(journal_home, event)
@@ -48,12 +60,21 @@ def journal_task_completed(
     note: str = "",
     session_id: str | None = None,
 ) -> str:
+    task_text = _clean_text(task_id)
+    note_text = _clean_text(note)
+    if not task_text and not note_text:
+        return SKIPPED_TASK_OR_NOTE_REQUIRED
+    semantic = {"status": "completed_claimed"}
+    if task_text:
+        semantic["task_id"] = task_text
+    if note_text:
+        semantic["note"] = note_text
     event = normalize_event(
         {
             "event_type": TASK_COMPLETED_CLAIM_EVENT_TYPE,
             "agent": agent,
             **_event_context(session_id),
-            "semantic": {"task_id": task_id, "status": "completed_claimed", "note": note},
+            "semantic": semantic,
         }
     )
     write_event(journal_home, event)
@@ -68,9 +89,13 @@ def journal_session_summary(
     summary: str = "",
     outcome: str = "unknown",
 ) -> str:
-    semantic = {"summary": summary, "outcome": outcome}
-    if task_id:
-        semantic["task_id"] = task_id
+    summary_text = _clean_text(summary)
+    if not summary_text:
+        return SKIPPED_SUMMARY_REQUIRED
+    semantic = {"summary": summary_text, "outcome": _clean_text(outcome) or "unknown"}
+    task_text = _clean_text(task_id)
+    if task_text:
+        semantic["task_id"] = task_text
     event = normalize_event(
         {
             "event_type": SESSION_SUMMARY_EVENT_TYPE,
@@ -90,12 +115,19 @@ def journal_task_blocked(
     reason: str = "",
     session_id: str | None = None,
 ) -> str:
+    reason_text = _clean_text(reason)
+    if not reason_text:
+        return SKIPPED_REASON_REQUIRED
+    semantic = {"status": "blocked", "reason": reason_text}
+    task_text = _clean_text(task_id)
+    if task_text:
+        semantic["task_id"] = task_text
     event = normalize_event(
         {
             "event_type": TASK_BLOCKED_EVENT_TYPE,
             "agent": agent,
             **_event_context(session_id),
-            "semantic": {"task_id": task_id, "status": "blocked", "reason": reason},
+            "semantic": semantic,
         }
     )
     write_event(journal_home, event)
