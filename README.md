@@ -148,42 +148,42 @@ local mirror by adding `.agentic-journal.toml` at or above the project paths
 that agents work from. Matching events are written to both the global root and
 the configured mirror root.
 
-For Cortex:
+Example project config:
 
 ```toml
-# /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml
+# /path/to/my-project/.agentic-journal.toml
 [project]
-id = "cortex"
-path = "/Users/varienos/Landing/Repo/cortex"
+id = "my-project"
+path = "."
 
 [mirror]
 enabled = true
-path = "Agentbase/.agentic-journal"
+path = ".agentic-journal"
 ```
 
 Relative `project.path` and `mirror.path` values resolve from the config file
-directory. The Cortex example writes to
-`/Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal`.
+directory. The example above writes to a `.agentic-journal` directory inside
+the project root.
 
 Backfill existing history into the mirror:
 
 ```bash
-agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml
+agentic-journal mirror sync --config /path/to/my-project/.agentic-journal.toml
 ```
 
 Limit sync to a single date or date range when needed:
 
 ```bash
-agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml --date 2026-06-13
-agentic-journal mirror sync --config /Users/varienos/Landing/Repo/cortex/.agentic-journal.toml --from 2026-06-01 --to 2026-06-13
+agentic-journal mirror sync --config /path/to/my-project/.agentic-journal.toml --date 2026-06-13
+agentic-journal mirror sync --config /path/to/my-project/.agentic-journal.toml --from 2026-06-01 --to 2026-06-13
 ```
 
 Read a mirror root directly:
 
 ```bash
-agentic-journal status --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --today
-agentic-journal report --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --today --print
-agentic-journal web --root /Users/varienos/Landing/Repo/cortex/Agentbase/.agentic-journal --host 127.0.0.1 --port 8765 --today
+agentic-journal status --root /path/to/my-project/.agentic-journal --today
+agentic-journal report --root /path/to/my-project/.agentic-journal --today --print
+agentic-journal web --root /path/to/my-project/.agentic-journal --host 127.0.0.1 --port 8765 --today
 ```
 
 Project mirrors contain the same summaries, notes, paths, branches, commit
