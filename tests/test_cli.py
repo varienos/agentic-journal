@@ -7,6 +7,7 @@ from pathlib import Path
 from agentic_journal.cli import main
 from agentic_journal.install import generate_wrapper_script
 from agentic_journal.mcp_server import journal_task_blocked, journal_task_completed
+from agentic_journal.storage import read_events_for_date, write_event
 
 
 def test_main_help_exits_cleanly(capsys):
@@ -84,6 +85,92 @@ def test_event_command_writes_session_summary_fields(tmp_path, monkeypatch):
     assert event["semantic"]["task_id"] == "TASK-8"
     assert event["semantic"]["summary"] == "Implemented session summary logging"
     assert event["semantic"]["outcome"] == "completed"
+
+
+def test_event_command_writes_model_operation_fields(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
+
+    exit_code = main(
+        [
+            "event",
+            "--type",
+            "model_operation",
+            "--agent",
+            "cortex",
+            "--session-id",
+            "chat-1",
+            "--provider",
+            "claude",
+            "--model",
+            "claude-opus-4-8-thinking-high",
+            "--operation",
+            "chat",
+            "--source",
+            "/api/chat",
+            "--status",
+            "completed",
+            "--duration-ms",
+            "1234",
+            "--input-tokens",
+            "1200",
+            "--output-tokens",
+            "340",
+            "--cached-input-tokens",
+            "100",
+            "--reasoning-tokens",
+            "50",
+            "--error-code",
+            "rate_limit",
+        ]
+    )
+
+    assert exit_code == 0
+    event_file = next((tmp_path / "events").glob("*.jsonl"))
+    event = json.loads(event_file.read_text().splitlines()[0])
+    assert event["event_type"] == "model_operation"
+    assert event["agent"] == "cortex"
+    assert event["session_id"] == "chat-1"
+    assert event["duration_ms"] == 1234
+    assert event["semantic"] == {
+        "provider": "claude",
+        "model": "claude-opus-4-8-thinking-high",
+        "operation": "chat",
+        "source": "/api/chat",
+        "status": "completed",
+    }
+    assert event["evidence"]["token_usage"] == {
+        "input_tokens": 1200,
+        "output_tokens": 340,
+        "cached_input_tokens": 100,
+        "reasoning_tokens": 50,
+    }
+    assert event["evidence"]["error_code"] == "rate_limit"
+
+
+def test_status_command_prints_model_activity_count(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("AGENTIC_JOURNAL_HOME", str(tmp_path))
+    main(
+        [
+            "event",
+            "--type",
+            "model_operation",
+            "--agent",
+            "cortex",
+            "--provider",
+            "claude",
+            "--model",
+            "claude-opus-4-8-thinking-high",
+            "--operation",
+            "workflow.step",
+            "--status",
+            "completed",
+        ]
+    )
+
+    exit_code = main(["status", "--today"])
+
+    assert exit_code == 0
+    assert "Model activity: 1" in capsys.readouterr().out
 
 
 def test_report_command_writes_markdown(tmp_path, monkeypatch):
@@ -184,6 +271,99 @@ def test_web_command_with_explicit_date_keeps_that_date(monkeypatch):
 
     assert exit_code == 0
     assert calls["default_date"] == "2026-06-01"
+
+
+def _stored_event(event_id, ts="2026-05-31T10:00:00+03:00", **updates):
+    event = {
+        "schema_version": 1,
+        "event_id": event_id,
+        "ts": ts,
+        "event_type": "agent_start",
+        "agent": "codex",
+        "semantic": {},
+        "evidence": {},
+        "files_changed": [],
+    }
+    event.update(updates)
+    return event
+
+
+def _write_cortex_project_config(project):
+    config_path = project / ".agentic-journal.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "[project]",
+                'id = "cortex"',
+                'path = "."',
+                "",
+                "[mirror]",
+                'path = "Agentbase/.agentic-journal"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return config_path
+
+
+def test_mirror_sync_backfills_matching_project_events(tmp_path, capsys):
+    global_root = tmp_path / "global"
+    project = tmp_path / "cortex"
+    agentbase = project / "Agentbase"
+    codebase = project / "Codebase" / "Cortex"
+    other = tmp_path / "other"
+    agentbase.mkdir(parents=True)
+    codebase.mkdir(parents=True)
+    other.mkdir()
+    write_event(global_root, _stored_event("agentbase", cwd=str(agentbase)))
+    write_event(global_root, _stored_event("codebase", cwd=str(codebase), repo=str(codebase)))
+    write_event(global_root, _stored_event("other", cwd=str(other)))
+    config_path = _write_cortex_project_config(project)
+
+    exit_code = main(["mirror", "sync", "--root", str(global_root), "--config", str(config_path)])
+
+    assert exit_code == 0
+    assert "scanned=3 matched=2 inserted=2 duplicates=0" in capsys.readouterr().out
+    mirror_root = agentbase / ".agentic-journal"
+    assert [event["event_id"] for event in read_events_for_date(mirror_root, "2026-05-31")] == [
+        "agentbase",
+        "codebase",
+    ]
+
+
+def test_status_command_reads_explicit_root(tmp_path, capsys):
+    mirror_root = tmp_path / "mirror"
+    write_event(mirror_root, _stored_event("mirror-event"))
+
+    exit_code = main(["status", "--root", str(mirror_root), "--date", "2026-05-31"])
+
+    assert exit_code == 0
+    assert "Raw events: 1" in capsys.readouterr().out
+
+
+def test_report_command_reads_and_writes_explicit_root(tmp_path):
+    mirror_root = tmp_path / "mirror"
+    write_event(mirror_root, _stored_event("mirror-event"))
+
+    exit_code = main(["report", "--root", str(mirror_root), "--date", "2026-05-31"])
+
+    assert exit_code == 0
+    assert (mirror_root / "reports" / "2026-05-31.md").exists()
+
+
+def test_web_command_passes_explicit_root(monkeypatch, tmp_path):
+    calls = {}
+
+    def fake_run_web_server(root, host, port, default_date, refresh_ms=2000, api_token=None):
+        calls["root"] = root
+
+    monkeypatch.setattr("agentic_journal.cli.run_web_server", fake_run_web_server)
+
+    exit_code = main(["web", "--root", str(tmp_path / "mirror"), "--date", "2026-06-01"])
+
+    assert exit_code == 0
+    assert calls["root"] == tmp_path / "mirror"
 
 
 def test_guard_session_end_writes_risky_fallback_when_semantic_entry_is_missing(tmp_path, monkeypatch, capsys):

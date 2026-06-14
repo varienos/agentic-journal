@@ -293,6 +293,33 @@ def test_session_summary_is_reported_as_session_summary():
     ]
 
 
+def test_model_operation_is_reported_as_model_activity():
+    items = classify_daily_work(
+        [
+            {
+                "event_type": "model_operation",
+                "agent": "cortex",
+                "session_id": "chat-1",
+                "repo": "/repo",
+                "duration_ms": 1234,
+                "semantic": {
+                    "provider": "claude",
+                    "model": "claude-opus-4-8-thinking-high",
+                    "operation": "chat",
+                    "source": "/api/chat",
+                    "status": "completed",
+                },
+                "evidence": {"token_usage": {"input_tokens": 1200, "output_tokens": 340}},
+            }
+        ]
+    )
+
+    assert items["model_activity"] == [
+        "chat - claude/claude-opus-4-8-thinking-high - status=completed - source=/api/chat - 1540 tokens - 1234ms - agent=cortex - repo=/repo"
+    ]
+    assert items["in_progress"] == []
+
+
 def test_session_summary_closes_matching_agent_start_in_report():
     items = classify_daily_work(
         [
@@ -340,6 +367,7 @@ def test_render_markdown_report_includes_required_sections():
     assert "# 2026-05-31 Agentic Journal" in markdown
     assert "Evidence Levels" in markdown
     assert "Verified Work" in markdown
+    assert "Model Activity" in markdown
     assert "Provider Coverage" in markdown
     assert "codex: 0 sessions, 0 summarized, 0 missing, 0 in progress, 0% coverage" in markdown
     assert "Notes" in markdown

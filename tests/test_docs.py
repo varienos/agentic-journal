@@ -27,3 +27,13 @@ def test_event_schema_docs_match_current_storage_and_privacy_contracts():
     assert "0700" in text
     assert "MAX_SEMANTIC_TEXT" in text
     assert "…[truncated]" in text
+
+
+def test_model_operation_docs_define_metadata_only_contract():
+    schema = Path("docs/event-schema.md").read_text(encoding="utf-8")
+    readme = Path("README.md").read_text(encoding="utf-8")
+
+    assert "`model_operation`" in schema
+    assert "`journal_model_operation`" in readme
+    assert "provider, model, operation" in schema
+    assert "prompts, completions, transcripts, or file contents" in schema

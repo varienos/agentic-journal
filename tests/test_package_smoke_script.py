@@ -13,6 +13,7 @@ def test_package_smoke_script_declares_packaged_entrypoint_checks():
     assert "session_summary" in text
     assert "journal_session_summary" in text
     assert "journal_task_completed" in text
+    assert "journal_model_operation" in text
     assert "PACKAGE-MCP-SESSION" in text
     assert "X-Agent-Journal-Token" in text
     assert "api_token=\"secret\"" in text

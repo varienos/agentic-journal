@@ -20,6 +20,7 @@ CLASSIFIED_KEYS = (
     "completed_verified",
     "completed_claimed",
     "session_summaries",
+    "model_activity",
     "in_progress",
     "blocked",
     "notes",
@@ -68,7 +69,7 @@ def _display_session_key(event: dict[str, Any]) -> tuple[str, str]:
 def build_session_views(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     sessions: dict[tuple[str, str], dict[str, Any]] = {}
     for event in events:
-        if not event.get("session_id") and event.get("event_type") not in SESSION_VIEW_EVENT_TYPES:
+        if event.get("event_type") not in SESSION_VIEW_EVENT_TYPES:
             continue
         key = _display_session_key(event)
         semantic = event.get("semantic") or {}
@@ -353,6 +354,7 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
       <div class="metric"><span>Verified</span><strong id="m-completed_verified">0</strong></div>
       <div class="metric"><span>Claimed</span><strong id="m-completed_claimed">0</strong></div>
       <div class="metric"><span>Sessions</span><strong id="m-session_summaries">0</strong></div>
+      <div class="metric"><span>Model Activity</span><strong id="m-model_activity">0</strong></div>
       <div class="metric"><span>In Progress</span><strong id="m-in_progress">0</strong></div>
       <div class="metric"><span>Blocked</span><strong id="m-blocked">0</strong></div>
       <div class="metric"><span>Notes</span><strong id="m-notes">0</strong></div>
@@ -372,6 +374,10 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
           <h2>Latest Events</h2>
           <div id="events" class="event-list"></div>
         </section>
+        <section data-section="model_activity">
+          <h2>Model Activity</h2>
+          <div id="model_activity" class="bucket-list"></div>
+        </section>
       </div>
       <div class="side">
         <section data-section="notes">
@@ -387,7 +393,7 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
   </main>
   <script>
     const refreshMs = {int(refresh_ms)};
-    const keys = ["completed_verified", "completed_claimed", "session_summaries", "in_progress", "blocked", "notes", "risky"];
+    const keys = ["completed_verified", "completed_claimed", "session_summaries", "model_activity", "in_progress", "blocked", "notes", "risky"];
     const statusEl = document.getElementById("status");
     const dateEl = document.getElementById("date");
     const eventsEl = document.getElementById("events");
@@ -517,6 +523,7 @@ def render_dashboard_html(default_date: date | str | None = None, refresh_ms: in
       renderSessions(payload.sessions);
       renderCoverage(payload.provider_coverage);
       renderEvents(payload.latest_events);
+      renderBucket("model_activity", payload.classified.model_activity);
       renderBucket("notes", payload.classified.notes);
       renderBucket("risky", payload.classified.risky);
       statusEl.textContent = `${{payload.raw_event_count}} raw events · updated ${{new Date().toLocaleTimeString()}}`;

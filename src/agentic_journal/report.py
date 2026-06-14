@@ -9,6 +9,7 @@ from agentic_journal.events import (
     AGENT_START_EVENT_TYPE,
     GIT_COMMIT_EVENT_TYPE,
     JOURNAL_MISSING_STATUS,
+    MODEL_OPERATION_EVENT_TYPE,
     SEMANTIC_NOTE_EVENT_TYPE,
     SESSION_EVENT_TYPES,
     SESSION_OUTCOME_EVENT_TYPES,
@@ -26,6 +27,9 @@ AGENT_ALIASES = {
 
 
 def event_label(event: dict[str, Any]) -> str:
+    if event.get("event_type") == MODEL_OPERATION_EVENT_TYPE:
+        return model_operation_label(event)
+
     semantic = event.get("semantic") or {}
     task_id = event_task_id(event)
     note = semantic.get("summary") or semantic.get("note") or semantic.get("reason")
@@ -42,6 +46,51 @@ def event_label(event: dict[str, Any]) -> str:
         bits.append(note)
     if outcome:
         bits.append(f"outcome={outcome}")
+    bits.append(f"agent={agent}")
+    bits.append(f"repo={repo}")
+    return " - ".join(bits)
+
+
+def _model_operation_token_total(event: dict[str, Any]) -> int | None:
+    token_usage = (event.get("evidence") or {}).get("token_usage") or {}
+    if not isinstance(token_usage, dict):
+        return None
+    primary = [
+        value
+        for key in ("input_tokens", "output_tokens")
+        if isinstance((value := token_usage.get(key)), int)
+    ]
+    if primary:
+        return sum(primary)
+    values = [value for value in token_usage.values() if isinstance(value, int)]
+    return sum(values) if values else None
+
+
+def model_operation_label(event: dict[str, Any]) -> str:
+    semantic = event.get("semantic") or {}
+    evidence = event.get("evidence") or {}
+    operation = semantic.get("operation") or "model_operation"
+    provider = semantic.get("provider")
+    model = semantic.get("model")
+    provider_model = "/".join(part for part in (provider, model) if part) or "unknown model"
+    repo = event.get("repo") or event.get("cwd") or "unknown repo"
+    agent = event.get("agent") or "unknown agent"
+    bits = [operation, provider_model]
+    status = semantic.get("status") or semantic.get("outcome")
+    source = semantic.get("source")
+    total_tokens = _model_operation_token_total(event)
+    duration_ms = event.get("duration_ms")
+    error_code = evidence.get("error_code")
+    if status:
+        bits.append(f"status={status}")
+    if source:
+        bits.append(f"source={source}")
+    if total_tokens is not None:
+        bits.append(f"{total_tokens} tokens")
+    if isinstance(duration_ms, int):
+        bits.append(f"{duration_ms}ms")
+    if error_code:
+        bits.append(f"error={error_code}")
     bits.append(f"agent={agent}")
     bits.append(f"repo={repo}")
     return " - ".join(bits)
@@ -135,6 +184,7 @@ def classify_daily_work(events: list[dict[str, Any]]) -> dict[str, list[str]]:
         "completed_verified": [],
         "completed_claimed": [],
         "session_summaries": [],
+        "model_activity": [],
         "in_progress": [],
         "blocked": [],
         "notes": [],
@@ -185,6 +235,8 @@ def classify_daily_work(events: list[dict[str, Any]]) -> dict[str, list[str]]:
                 classified["completed_claimed"].append(event_label(event))
         elif event_type == SESSION_SUMMARY_EVENT_TYPE:
             classified["session_summaries"].append(event_label(event))
+        elif event_type == MODEL_OPERATION_EVENT_TYPE:
+            classified["model_activity"].append(event_label(event))
         elif event_type == TASK_BLOCKED_EVENT_TYPE or semantic.get("status") == "blocked":
             classified["blocked"].append(event_label(event))
         elif event_type == SEMANTIC_NOTE_EVENT_TYPE:
@@ -229,6 +281,7 @@ def render_markdown_report(
         f"- Completed verified: {len(classified.get('completed_verified', []))}",
         f"- Completed claimed: {len(classified.get('completed_claimed', []))}",
         f"- Session summaries: {len(classified.get('session_summaries', []))}",
+        f"- Model activity: {len(classified.get('model_activity', []))}",
         f"- In progress: {len(classified.get('in_progress', []))}",
         f"- Blocked: {len(classified.get('blocked', []))}",
         f"- Notes: {len(classified.get('notes', []))}",
@@ -249,6 +302,7 @@ def render_markdown_report(
         ("Verified Work (Completed Verified)", "completed_verified"),
         ("Claimed Work (Completed Claimed)", "completed_claimed"),
         ("Session Outcomes", "session_summaries"),
+        ("Model Activity", "model_activity"),
         ("Observed / In Progress", "in_progress"),
         ("Blocked", "blocked"),
         ("Notes", "notes"),

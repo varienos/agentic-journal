@@ -18,6 +18,7 @@ the day in a style close to git history:
 
 - session starts and ends from wrapped agent commands
 - explicit session summaries and semantic notes from MCP tools
+- model operation activity emitted by project runtimes without prompt bodies
 - claimed completed tasks, blocked tasks, and verification evidence
 - git commit metadata and changed files
 - risky sessions that ended without a semantic journal entry
@@ -37,6 +38,7 @@ The project is intentionally local-first. Runtime data is stored under
 - Git post-commit hook installer
 - Daily Markdown report generation with verified, claimed, observed, and risky evidence levels
 - Live web dashboard with auto-refreshing event data and optional API token
+- Configurable project-local journal mirrors for repo-scoped dashboards and containers
 - `CHANGELOG.md` plus tag-driven GitHub release automation
 - JSONL and SQLite event storage
 
@@ -120,6 +122,24 @@ agentic-journal event --type session_summary --agent codex \
   --outcome completed
 ```
 
+Record a model operation from a runtime integration:
+
+```bash
+agentic-journal event --type model_operation --agent cortex \
+  --session-id chat-1 \
+  --provider claude \
+  --model claude-opus-4-8-thinking-high \
+  --operation chat \
+  --source /api/chat \
+  --status completed \
+  --duration-ms 1234 \
+  --input-tokens 1200 \
+  --output-tokens 340
+```
+
+`model_operation` is metadata-only. Do not store prompts, completions,
+transcripts, or file contents in these events.
+
 Generate today's report:
 
 ```bash
@@ -139,6 +159,56 @@ agentic-journal web --host 127.0.0.1 --port 8765 --today
 ```
 
 Open `http://127.0.0.1:8765`.
+
+## Project-Local Mirrors
+
+The global journal remains the source of truth, but a project can opt into a
+local mirror by adding `.agentic-journal.toml` at or above the project paths
+that agents work from. Matching events are written to both the global root and
+the configured mirror root.
+
+Example project config:
+
+```toml
+# /path/to/my-project/.agentic-journal.toml
+[project]
+id = "my-project"
+path = "."
+
+[mirror]
+enabled = true
+path = ".agentic-journal"
+```
+
+Relative `project.path` and `mirror.path` values resolve from the config file
+directory. The example above writes to a `.agentic-journal` directory inside
+the project root.
+
+Backfill existing history into the mirror:
+
+```bash
+agentic-journal mirror sync --config /path/to/my-project/.agentic-journal.toml
+```
+
+Limit sync to a single date or date range when needed:
+
+```bash
+agentic-journal mirror sync --config /path/to/my-project/.agentic-journal.toml --date 2026-06-13
+agentic-journal mirror sync --config /path/to/my-project/.agentic-journal.toml --from 2026-06-01 --to 2026-06-13
+```
+
+Read a mirror root directly:
+
+```bash
+agentic-journal status --root /path/to/my-project/.agentic-journal --today
+agentic-journal report --root /path/to/my-project/.agentic-journal --today --print
+agentic-journal web --root /path/to/my-project/.agentic-journal --host 127.0.0.1 --port 8765 --today
+```
+
+Project mirrors contain the same summaries, notes, paths, branches, commit
+hashes, and evidence metadata as the global journal. Keep mirror directories
+out of git, and mount only the project mirror into containers that need the
+project panel.
 
 ## MCP Setup
 
@@ -160,6 +230,7 @@ Available MCP tools:
 - `journal_session_summary`
 - `journal_task_completed`
 - `journal_task_blocked`
+- `journal_model_operation`
 - `journal_daily_report`
 
 MCP writes inherit `AGENTIC_JOURNAL_SESSION_ID` when present and attach the
@@ -218,6 +289,9 @@ Agentic Journal writes each event to both:
 
 Duplicate `event_id` writes are ignored in both SQLite and the JSONL mirror so
 the two stores stay aligned.
+
+When a project mirror config matches an event `cwd` or `repo`, the same event is
+also written to that mirror root using the identical SQLite and JSONL layout.
 
 Reports are written to:
 

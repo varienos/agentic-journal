@@ -36,6 +36,22 @@ Outcome events:
 - `semantic.task_id` should be set when the session maps to a Backlog task or
   other stable task identifier.
 
+Model operation events:
+
+- `model_operation` records one model call or model-backed step from a project
+  runtime such as Cortex.
+- Store labels in `semantic`: provider, model, operation, source, and status.
+- Store measured facts in `evidence`: `token_usage` with numeric
+  `input_tokens`, `output_tokens`, `cached_input_tokens`,
+  `cache_creation_input_tokens`, or `reasoning_tokens`, plus `error_code` when
+  available.
+- Use top-level `duration_ms` for elapsed runtime and `session_id` for the
+  caller's correlation id when available.
+- `model_operation` events are reported under Model Activity. They are not
+  session outcome events and do not satisfy the session-end guard.
+- Never store prompts, completions, transcripts, or file contents in
+  `model_operation`.
+
 Correlation rules:
 
 - `commit` is the strongest verification key. A `git_commit` item is
@@ -67,13 +83,26 @@ Correlation rules:
 - Guard fallback events include `files_changed` from git status when available.
   This gives objective context for missing summaries without storing prompt
   transcripts or inventing completed work.
-- Duplicate `event_id` writes are ignored so SQLite and the daily JSONL mirror
+- Duplicate `event_id` writes are ignored so SQLite and the daily JSONL files
   remain aligned.
 - SQLite stores the complete event payload in `raw_json`; `raw_json` is the source of truth.
   denormalized index columns such as `ts`, `repo`, `agent`, `event_type`, and
   `session_id` are query accelerators that can be rebuilt from `raw_json`.
 - Events with a future `schema_version` are skipped by current readers instead
   of being silently misclassified.
+
+Project mirror rules:
+
+- A `.agentic-journal.toml` file can opt a project into a local mirror. Matching
+  is based on exact or child-path matches against the event `repo` or `cwd`.
+- Mirror roots use the same event schema, SQLite table, daily JSONL layout, and
+  idempotent `event_id` behavior as the global journal.
+- Mirror writes preserve the original event payload. They do not add
+  project-specific fields or rewrite paths.
+- Global journal writes remain primary. A mirror write failure is reported to
+  stderr and does not fail the global write.
+- Readers can point `status`, `report`, or `web` at a mirror root with `--root`
+  and receive the same report or API payload shape as the global journal.
 
 Privacy rules:
 
@@ -83,5 +112,10 @@ Privacy rules:
   keys, and secret-looking values in both structured fields and free text.
 - Journal directories and files are owner-only by default: directories are
   written with `0700`, files and SQLite/WAL sidecars with `0600`.
+- Project mirrors contain the same sensitive summaries, notes, paths, branch
+  names, commit hashes, and evidence metadata as the global journal. Keep mirror
+  directories out of git and mount them only into trusted containers.
 - Free-text semantic fields are capped by `MAX_SEMANTIC_TEXT`; oversized
   `summary`, `note`, and `reason` values are truncated with `…[truncated]`.
+- Numeric `evidence.token_usage` values are preserved for model operation
+  reporting; secret-looking token keys such as API tokens are still redacted.
